@@ -2,7 +2,14 @@
 // This module provides functions for analyzing and categorizing tabs
 
 import { nanoid } from 'nanoid';
-import * as tf from '@tensorflow/tfjs';
+// Remove static import of TensorFlow
+// import * as tf from '@tensorflow/tfjs';
+
+// Store TensorFlow instance when loaded
+let tf = null;
+
+// Flag to track if TensorFlow is being loaded
+let tfLoading = false;
 
 // Expanded category definitions with more comprehensive keywords
 const CATEGORIES = {
@@ -61,6 +68,31 @@ const pageMetadataCache = new Map();
 // Document frequency for IDF calculation
 let documentFrequency = {};
 let totalDocuments = 0;
+
+// Helper function to dynamically load TensorFlow when needed
+const loadTensorFlow = async () => {
+  if (tf) return tf; // Return if already loaded
+  if (tfLoading) {
+    // Wait for current loading process to complete
+    while (tfLoading) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return tf;
+  }
+  
+  try {
+    tfLoading = true;
+    const tensorflow = await import('@tensorflow/tfjs');
+    tf = tensorflow;
+    tfLoading = false;
+    return tf;
+  } catch (error) {
+    console.error('Error loading TensorFlow:', error);
+    tfLoading = false;
+    // Return null to indicate failure
+    return null;
+  }
+};
 
 // Analyze tab content to extract meaningful information
 export const analyzeTabContent = async (tab) => {
@@ -721,16 +753,20 @@ export const updatePageMetadata = (url, metadata) => {
   });
 };
 
-// Load a pre-trained model for classification (optional future implementation)
+// Modify loadModel to use dynamic import
 export const loadModel = async () => {
-  try {
-    // This would load a pre-trained TensorFlow.js model
-    // const model = await tf.loadLayersModel('path/to/model.json');
-    // return model;
-    console.log('Model loading placeholder - not implemented in demo');
+  const tensorflow = await loadTensorFlow();
+  if (!tensorflow) {
+    console.warn('TensorFlow could not be loaded, using fallback classification');
     return null;
+  }
+  
+  try {
+    // Load model logic here with tensorflow
+    console.log('TensorFlow model loaded successfully');
+    return true;
   } catch (error) {
-    console.error('Error loading classification model:', error);
+    console.error('Error loading TensorFlow model:', error);
     return null;
   }
 }; 

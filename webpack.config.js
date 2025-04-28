@@ -17,6 +17,31 @@ module.exports = {
     filename: '[name].js',
     clean: true
   },
+  optimization: {
+    splitChunks: {
+      chunks: 'all',
+      maxInitialRequests: 25,
+      minSize: 20000,
+      cacheGroups: {
+        vendor: {
+          test: /[\\/]node_modules[\\/]/,
+          name(module) {
+            const packageName = module.context.match(/[\\/]node_modules[\\/](.*?)([\\/]|$)/)[1];
+            if (packageName.includes('tensorflow')) {
+              return 'vendor.tensorflow';
+            }
+            if (packageName.includes('react')) {
+              return 'vendor.react';
+            }
+            if (packageName.includes('icons')) {
+              return 'vendor.icons';
+            }
+            return 'vendor';
+          }
+        }
+      }
+    }
+  },
   module: {
     rules: [
       {

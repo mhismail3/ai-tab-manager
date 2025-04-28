@@ -1,29 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  FiCpu, 
-  FiGrid, 
-  FiSave, 
-  FiArchive, 
-  FiSettings, 
-  FiFile, 
-  FiLayers,
-  FiTablet,
-  FiInbox,
-  FiBarChart2,
-  FiClock,
-  FiActivity,
-  FiTrash2,
-  FiRefreshCw
-} from 'react-icons/fi';
-import StatCard from '../components/StatCard';
-import TabList from '../components/TabList';
-import SavedTabGroups from '../components/SavedTabGroups';
-import SuggestionCard from '../components/SuggestionCard';
-import { getTabActivityData, getTabUsageStatistics } from '../models/tabActivity';
-import { loadTabGroups } from '../models/tabStorage';
-import { suggestTabCleanup } from '../models/tabClassifier';
-import SettingsForm from '../components/SettingsForm';
-import TabGroups from '../components/TabGroups';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
+// Import only the icons used in the overview tab initially
+import { FiRefreshCw, FiCpu, FiTablet, FiLayers, FiSave, FiClock } from 'react-icons/fi';
+
+// Lazy load components
+const StatCard = lazy(() => import('../components/StatCard'));
+const TabList = lazy(() => import('../components/TabList'));
+const SavedTabGroups = lazy(() => import('../components/SavedTabGroups'));
+const SuggestionCard = lazy(() => import('../components/SuggestionCard'));
+const SettingsForm = lazy(() => import('../components/SettingsForm'));
+const TabGroups = lazy(() => import('../components/TabGroups'));
+
+// Lazy load tab-specific icons when needed
+const loadAdditionalIcons = async () => {
+  const module = await import('react-icons/fi');
+  return {
+    FiGrid: module.FiGrid,
+    FiFile: module.FiFile,
+    FiInbox: module.FiInbox,
+    FiBarChart2: module.FiBarChart2,
+    FiActivity: module.FiActivity,
+    FiArchive: module.FiArchive,
+    FiSettings: module.FiSettings,
+    FiTrash2: module.FiTrash2
+  };
+};
+
+// Import functions dynamically
+const tabActivityImport = import('../models/tabActivity');
+const tabStorageImport = import('../models/tabStorage');
+const tabClassifierImport = import('../models/tabClassifier');
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -39,9 +44,16 @@ const Dashboard = () => {
   const [savedGroups, setSavedGroups] = useState([]);
   const [cleanupSuggestions, setCleanupSuggestions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [additionalIcons, setAdditionalIcons] = useState(null);
   
   useEffect(() => {
+    // Load all necessary data
     loadDashboardData();
+    
+    // Load additional icons if not on overview tab
+    if (activeTab !== 'overview' && !additionalIcons) {
+      loadAdditionalIcons().then(setAdditionalIcons);
+    }
     
     // Check URL parameters for tab selection
     const urlParams = new URLSearchParams(window.location.search);
@@ -56,7 +68,7 @@ const Dashboard = () => {
         }
       });
     }
-  }, []);
+  }, [activeTab]);
   
   const loadDashboardData = async () => {
     setLoading(true);
@@ -81,16 +93,23 @@ const Dashboard = () => {
       }
       
       // Get saved tab groups
-      const savedTabGroups = await loadTabGroups();
+      const [tabStorageModule] = await Promise.all([
+        tabStorageImport
+      ]);
+      const savedTabGroups = await tabStorageModule.loadTabGroups();
       
-      // Get activity data
-      const activityData = await getTabActivityData();
-      
-      // Get usage statistics
-      const usageStats = await getTabUsageStatistics();
+      // Get activity data and usage statistics
+      const [tabActivityModule] = await Promise.all([
+        tabActivityImport
+      ]);
+      const activityData = await tabActivityModule.getTabActivityData();
+      const usageStats = await tabActivityModule.getTabUsageStatistics();
       
       // Get cleanup suggestions - this now filters out already grouped tabs
-      const cleanupSuggestions = await suggestTabCleanup(allTabs, activityData);
+      const [tabClassifierModule] = await Promise.all([
+        tabClassifierImport
+      ]);
+      const cleanupSuggestions = await tabClassifierModule.suggestTabCleanup(allTabs, activityData);
       
       // Calculate tab age
       let oldestTabDate = Date.now();
@@ -136,20 +155,56 @@ const Dashboard = () => {
     });
   };
   
+  // Ensure all icons are loaded before switching tab
+  const handleTabChange = (tabName) => {
+    if (!additionalIcons && tabName !== 'overview') {
+      // Load icons first
+      loadAdditionalIcons().then(icons => {
+        setAdditionalIcons(icons);
+        setActiveTab(tabName);
+      });
+    } else {
+      setActiveTab(tabName);
+    }
+  };
+  
   const renderActiveTab = () => {
+    // Create fallback for suspense
+    const loadingFallback = <div className="loading-container">Loading...</div>;
+    
     switch (activeTab) {
       case 'overview':
         return renderOverview();
       case 'tabs':
-        return renderAllTabs();
+        return !additionalIcons ? loadingFallback : (
+          <Suspense fallback={loadingFallback}>
+            {renderAllTabs()}
+          </Suspense>
+        );
       case 'saved':
-        return renderSavedGroups();
+        return !additionalIcons ? loadingFallback : (
+          <Suspense fallback={loadingFallback}>
+            {renderSavedGroups()}
+          </Suspense>
+        );
       case 'groups':
-        return renderTabGroups();
+        return !additionalIcons ? loadingFallback : (
+          <Suspense fallback={loadingFallback}>
+            {renderTabGroups()}
+          </Suspense>
+        );
       case 'analytics':
-        return renderAnalytics();
+        return !additionalIcons ? loadingFallback : (
+          <Suspense fallback={loadingFallback}>
+            {renderAnalytics()}
+          </Suspense>
+        );
       case 'settings':
-        return renderSettings();
+        return !additionalIcons ? loadingFallback : (
+          <Suspense fallback={loadingFallback}>
+            {renderSettings()}
+          </Suspense>
+        );
       default:
         return renderOverview();
     }
@@ -169,37 +224,39 @@ const Dashboard = () => {
       </div>
       
       <div className="dashboard-grid" style={{ marginBottom: '30px' }}>
-        <StatCard 
-          title="Open Tabs"
-          value={stats.totalTabs}
-          icon={<FiTablet size={18} />}
-          color="var(--primary)"
-          description={`Across ${stats.totalWindows} windows`}
-        />
-        
-        <StatCard 
-          title="Tab Groups"
-          value={tabGroups.length}
-          icon={<FiLayers size={18} />}
-          color="var(--secondary)"
-          description="Active browser tab groups"
-        />
-        
-        <StatCard 
-          title="Saved Sessions"
-          value={stats.savedGroups}
-          icon={<FiSave size={18} />}
-          color="var(--success)"
-          description="Saved for later access"
-        />
-        
-        <StatCard 
-          title="Oldest Tab"
-          value={`${stats.oldestTab} days`}
-          icon={<FiClock size={18} />}
-          color="var(--warning)"
-          description="Since last accessed"
-        />
+        <Suspense fallback={<div>Loading stats...</div>}>
+          <StatCard 
+            title="Open Tabs"
+            value={stats.totalTabs}
+            icon={<FiTablet size={18} />}
+            color="var(--primary)"
+            description={`Across ${stats.totalWindows} windows`}
+          />
+          
+          <StatCard 
+            title="Tab Groups"
+            value={tabGroups.length}
+            icon={<FiLayers size={18} />}
+            color="var(--secondary)"
+            description="Active browser tab groups"
+          />
+          
+          <StatCard 
+            title="Saved Sessions"
+            value={stats.savedGroups}
+            icon={<FiSave size={18} />}
+            color="var(--success)"
+            description="Saved for later access"
+          />
+          
+          <StatCard 
+            title="Oldest Tab"
+            value={`${stats.oldestTab} days`}
+            icon={<FiClock size={18} />}
+            color="var(--warning)"
+            description="Since last accessed"
+          />
+        </Suspense>
       </div>
       
       {cleanupSuggestions.length > 0 && (
@@ -212,43 +269,45 @@ const Dashboard = () => {
           </div>
           
           <div>
-            {cleanupSuggestions.map(group => (
-              <SuggestionCard 
-                key={group.id}
-                suggestion={{
-                  type: 'cleanup',
-                  message: `You have ${group.tabs.length} similar tabs from ${group.name}`,
-                  action: 'Group These Tabs',
-                  defaultGroupName: group.name
-                }}
-                onAction={(groupName) => {
-                  // Use provided group name or fall back to original name
-                  const finalGroupName = groupName || group.name;
-                  
-                  chrome.runtime.sendMessage({ 
-                    action: 'createTabGroup', 
-                    tabIds: group.tabs.map(tab => tab.id),
-                    groupName: finalGroupName
-                  }, (response) => {
-                    if (response && response.success) {
-                      // Remove this suggestion from the list
-                      setCleanupSuggestions(
-                        cleanupSuggestions.filter(item => item.id !== group.id)
-                      );
-                      
-                      // Refresh data to show updated groups
-                      loadDashboardData();
-                    }
-                  });
-                }}
-                onDismiss={() => {
-                  // Remove this suggestion from the list
-                  setCleanupSuggestions(
-                    cleanupSuggestions.filter(item => item.id !== group.id)
-                  );
-                }}
-              />
-            ))}
+            <Suspense fallback={<div>Loading suggestions...</div>}>
+              {cleanupSuggestions.map(group => (
+                <SuggestionCard 
+                  key={group.id}
+                  suggestion={{
+                    type: 'cleanup',
+                    message: `You have ${group.tabs.length} similar tabs from ${group.name}`,
+                    action: 'Group These Tabs',
+                    defaultGroupName: group.name
+                  }}
+                  onAction={(groupName) => {
+                    // Use provided group name or fall back to original name
+                    const finalGroupName = groupName || group.name;
+                    
+                    chrome.runtime.sendMessage({ 
+                      action: 'createTabGroup', 
+                      tabIds: group.tabs.map(tab => tab.id),
+                      groupName: finalGroupName
+                    }, (response) => {
+                      if (response && response.success) {
+                        // Remove this suggestion from the list
+                        setCleanupSuggestions(
+                          cleanupSuggestions.filter(item => item.id !== group.id)
+                        );
+                        
+                        // Refresh data to show updated groups
+                        loadDashboardData();
+                      }
+                    });
+                  }}
+                  onDismiss={() => {
+                    // Remove this suggestion from the list
+                    setCleanupSuggestions(
+                      cleanupSuggestions.filter(item => item.id !== group.id)
+                    );
+                  }}
+                />
+              ))}
+            </Suspense>
           </div>
         </div>
       )}
