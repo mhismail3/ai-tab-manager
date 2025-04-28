@@ -1,0 +1,161 @@
+import React from 'react';
+import { FiX, FiExternalLink, FiStar, FiClock } from 'react-icons/fi';
+
+const TabList = ({ tabs, loading, showFavIcon = true, onClose, onSelect }) => {
+  const handleTabClick = (tab) => {
+    if (onSelect) {
+      onSelect(tab);
+    } else {
+      // Default behavior: focus on the tab
+      chrome.tabs.update(tab.id, { active: true });
+      chrome.windows.update(tab.windowId, { focused: true });
+    }
+  };
+
+  const handleTabClose = (e, tabId) => {
+    e.stopPropagation();
+    
+    chrome.tabs.remove(tabId, () => {
+      if (onClose) {
+        onClose(tabId);
+      }
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="loading-state" style={{ textAlign: 'center', padding: '20px 0' }}>
+        <div className="loading-spinner" style={{ 
+          width: '20px', 
+          height: '20px', 
+          border: '2px solid rgba(0, 0, 0, 0.1)', 
+          borderTopColor: 'var(--primary)',
+          borderRadius: '50%',
+          margin: '0 auto',
+          animation: 'spin 1s linear infinite'
+        }}></div>
+        <p style={{ marginTop: '8px', color: '#6B7280' }}>Loading tabs...</p>
+        <style>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  if (tabs.length === 0) {
+    return (
+      <div className="empty-state" style={{ 
+        textAlign: 'center', 
+        padding: '30px 10px',
+        backgroundColor: '#f9fafb',
+        borderRadius: '8px'
+      }}>
+        <FiExternalLink size={24} style={{ color: '#9CA3AF', marginBottom: '12px' }} />
+        <p style={{ margin: '0', color: '#6B7280' }}>No tabs found</p>
+      </div>
+    );
+  }
+
+  return (
+    <ul style={{ 
+      listStyle: 'none', 
+      padding: 0, 
+      margin: 0,
+      maxHeight: '320px',
+      overflowY: 'auto'
+    }}>
+      {tabs.map(tab => (
+        <li 
+          key={tab.id}
+          onClick={() => handleTabClick(tab)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            padding: '8px',
+            borderRadius: '6px',
+            marginBottom: '4px',
+            cursor: 'pointer',
+            background: 'white',
+            border: '1px solid var(--border-color)',
+            transition: 'background-color 0.1s ease'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.backgroundColor = '#f9fafb';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.backgroundColor = 'white';
+          }}
+        >
+          {showFavIcon && tab.favIconUrl && (
+            <img 
+              src={tab.favIconUrl} 
+              alt=""
+              style={{
+                width: '16px',
+                height: '16px',
+                marginRight: '10px',
+                objectFit: 'contain'
+              }}
+              onError={(e) => {
+                e.target.style.display = 'none';
+              }}
+            />
+          )}
+          
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <div style={{
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              fontSize: '13px',
+              fontWeight: 500
+            }}>
+              {tab.title}
+            </div>
+            <div style={{
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              fontSize: '11px',
+              color: '#6B7280'
+            }}>
+              {tab.url}
+            </div>
+          </div>
+          
+          <button
+            onClick={(e) => handleTabClose(e, tab.id)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: '5px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginLeft: '5px',
+              color: '#9CA3AF',
+              cursor: 'pointer'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = '#f3f4f6';
+              e.currentTarget.style.color = '#EF4444';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = '#9CA3AF';
+            }}
+            title="Close tab"
+          >
+            <FiX size={14} />
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+};
+
+export default TabList; 

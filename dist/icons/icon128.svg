@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4a6cf7"/>
+      <stop offset="100%" stop-color="#6e48aa"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" fill="url(#grad)" rx="16" ry="16"/>
+  <rect x="32" y="40" width="64" height="48" fill="#ffffff" rx="8" ry="8"/>
+  <line x1="40" y1="56" x2="88" y2="56" stroke="rgba(0,0,0,0.3)" stroke-width="3"/>
+  <line x1="40" y1="72" x2="88" y2="72" stroke="rgba(0,0,0,0.3)" stroke-width="3"/>
+  
+  <!-- AI chip pattern -->
+  <circle cx="96" cy="32" r="16" fill="rgba(255,255,255,0.2)" />
+  <path d="M96,20 L96,44" stroke="rgba(255,255,255,0.6)" stroke-width="2" />
+  <path d="M84,32 L108,32" stroke="rgba(255,255,255,0.6)" stroke-width="2" />
+  <path d="M88,24 L104,40" stroke="rgba(255,255,255,0.6)" stroke-width="2" />
+  <path d="M104,24 L88,40" stroke="rgba(255,255,255,0.6)" stroke-width="2" />
+</svg> 
