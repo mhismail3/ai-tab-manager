@@ -150,7 +150,7 @@ const Dashboard = () => {
         </button>
       </div>
       
-      <div className="dashboard-grid">
+      <div className="dashboard-grid" style={{ marginBottom: '30px' }}>
         <StatCard 
           title="Open Tabs"
           value={stats.totalTabs}
@@ -185,7 +185,7 @@ const Dashboard = () => {
       </div>
       
       {cleanupSuggestions.length > 0 && (
-        <div className="card mt-4">
+        <div className="card mt-4" style={{ marginTop: '30px' }}>
           <div className="card-header">
             <h2 className="card-title">Suggested Cleanup</h2>
             <button className="btn btn-primary" onClick={handleOrganizeTabs}>
@@ -226,7 +226,7 @@ const Dashboard = () => {
         </div>
       )}
       
-      <div className="card mt-4">
+      <div className="card mt-4" style={{ marginTop: '30px' }}>
         <div className="card-header">
           <h2 className="card-title">Recent Tabs</h2>
           <a href="#" onClick={() => setActiveTab('tabs')}>View All</a>
