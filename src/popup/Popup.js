@@ -162,11 +162,13 @@ const Popup = () => {
         <QuickActions />
         
         {suggestion && (
-          <SuggestionCard 
-            suggestion={suggestion} 
-            onAction={handleOrganizeTabs}
-            onDismiss={() => setSuggestion(null)}
-          />
+          <div style={{ marginTop: '16px' }}>
+            <SuggestionCard 
+              suggestion={suggestion} 
+              onAction={handleOrganizeTabs}
+              onDismiss={() => setSuggestion(null)}
+            />
+          </div>
         )}
         
         <div className="tab-section mt-4">

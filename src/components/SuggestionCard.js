@@ -40,6 +40,7 @@ const SuggestionCard = ({ suggestion, onAction, onDismiss }) => {
       className="suggestion-card"
       style={{
         padding: '14px',
+        marginTop: '16px',
         marginBottom: '16px',
         borderRadius: '8px',
         backgroundColor: getBackground(type),
