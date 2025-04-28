@@ -166,7 +166,26 @@ const QuickActions = () => {
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
   
   const handleOrganize = () => {
-    chrome.runtime.sendMessage({ action: 'organizeTabs' });
+    chrome.runtime.sendMessage({ action: 'organizeTabs' }, (response) => {
+      if (response && response.success) {
+        setToast({
+          visible: true,
+          message: response.message || 'Tabs organized successfully!',
+          type: 'success'
+        });
+      } else {
+        setToast({
+          visible: true,
+          message: response?.error || 'Failed to organize tabs',
+          type: 'error'
+        });
+      }
+      
+      // Hide toast after 3 seconds
+      setTimeout(() => {
+        setToast(prev => ({ ...prev, visible: false }));
+      }, 3000);
+    });
   };
 
   const handleSaveTabs = () => {
@@ -249,7 +268,11 @@ const QuickActions = () => {
         defaultName={`Saved Tabs - ${new Date().toLocaleDateString()}`}
       />
       
-      <Toast {...toast} />
+      <Toast 
+        message={toast.message}
+        isVisible={toast.visible}
+        type={toast.type}
+      />
     </div>
   );
 };

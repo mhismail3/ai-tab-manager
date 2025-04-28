@@ -153,21 +153,25 @@ const SavedTabGroups = ({ groups, loading, onDelete }) => {
                     <div style={{ flex: 1, overflow: 'hidden' }}>
                       <div
                         style={{
-                          whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           fontWeight: 500,
+                          wordBreak: 'break-word',
+                          maxHeight: '2.4em',
+                          lineHeight: '1.2em'
                         }}
                       >
                         {tab.title}
                       </div>
                       <div
                         style={{
-                          whiteSpace: 'nowrap',
+                          wordBreak: 'break-all',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           fontSize: '12px',
                           color: '#6B7280',
+                          maxHeight: '2.4em',
+                          lineHeight: '1.2em'
                         }}
                       >
                         {tab.url}

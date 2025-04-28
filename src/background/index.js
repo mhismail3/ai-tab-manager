@@ -73,71 +73,178 @@ const organizeTabs = async () => {
   
   if (!tabs || tabs.length < 2) {
     console.log('Not enough tabs to organize');
-    return;
+    return { success: false, error: 'Not enough tabs to organize' };
   }
   
-  // If we're using AI classification
-  if (state.settings.useAI) {
-    // This is a placeholder for AI-based tab classification
-    // In a real implementation, this would use a machine learning model
-    const tabGroups = await classifyTabs(tabs);
+  // Instead of just checking if chrome.tabGroups exists, check if the required methods are available
+  const hasTabGroupsSupport = typeof chrome.tabs.group === 'function' && 
+                              typeof chrome.tabGroups?.update === 'function';
+  
+  if (!hasTabGroupsSupport) {
+    console.warn('Tab Groups API not fully available, using fallback method');
     
-    // Create tab groups in Chrome
-    Object.entries(tabGroups).forEach(async ([groupName, groupTabs]) => {
-      if (groupTabs.length > 1) {
-        const tabIds = groupTabs.map(tab => tab.id);
-        
-        // Create a new tab group
-        const groupId = await new Promise(resolve => {
-          chrome.tabs.group({ tabIds }, (groupId) => resolve(groupId));
-        });
-        
-        // Set the group title
-        chrome.tabGroups.update(groupId, { title: groupName });
-      }
-    });
-  } else {
-    // Simple domain-based grouping as fallback
-    const domains = {};
-    
-    tabs.forEach(tab => {
-      try {
-        const url = new URL(tab.url);
-        const domain = url.hostname;
-        
-        if (!domains[domain]) {
-          domains[domain] = [];
-        }
-        
-        domains[domain].push(tab.id);
-      } catch (error) {
-        console.warn('Invalid URL:', tab.url);
-      }
-    });
-    
-    // Create tab groups for domains with multiple tabs
-    Object.entries(domains).forEach(async ([domain, tabIds]) => {
-      if (tabIds.length > 1) {
-        const groupId = await new Promise(resolve => {
-          chrome.tabs.group({ tabIds }, (groupId) => resolve(groupId));
-        });
-        
-        // Extract domain name for group title
-        let title = domain.replace('www.', '');
-        if (title.includes('.')) {
-          title = title.split('.')[0];
-        }
-        
-        // Capitalize first letter
-        title = title.charAt(0).toUpperCase() + title.slice(1);
-        
-        chrome.tabGroups.update(groupId, { title });
-      }
-    });
+    try {
+      // Fallback: Save tabs instead of grouping them
+      const timestamp = new Date().toLocaleString();
+      const groupName = `Auto-Organized - ${timestamp}`;
+      
+      // Format tabs for storage
+      const tabData = tabs.map(tab => ({
+        url: tab.url,
+        title: tab.title,
+        favIconUrl: tab.favIconUrl || '',
+        savedAt: Date.now()
+      }));
+      
+      // Save to storage
+      await saveTabGroup(groupName, tabData);
+      
+      return { 
+        success: true, 
+        fallback: true,
+        message: `Tab Groups API not available, but ${tabs.length} tabs were saved to "${groupName}" for reference.`
+      };
+    } catch (fallbackError) {
+      console.error('Error in fallback tab saving:', fallbackError);
+      return { 
+        success: false, 
+        error: 'Could not organize tabs. Your browser may not support tab groups. Check you are using Chrome version 89 or newer.'
+      };
+    }
   }
   
-  console.log('Tab organization complete');
-  return { success: true };
+  try {
+    // If we're using AI classification
+    if (state.settings.useAI) {
+      // This is a placeholder for AI-based tab classification
+      // In a real implementation, this would use a machine learning model
+      const tabGroups = await classifyTabs(tabs);
+      
+      // Create tab groups in Chrome
+      for (const [groupName, groupTabs] of Object.entries(tabGroups)) {
+        if (groupTabs.length > 1) {
+          try {
+            const tabIds = groupTabs.map(tab => tab.id);
+            
+            // Create a new tab group with error handling
+            let groupId;
+            try {
+              groupId = await new Promise((resolve, reject) => {
+                chrome.tabs.group({ tabIds }, (groupId) => {
+                  if (chrome.runtime.lastError) {
+                    reject(chrome.runtime.lastError);
+                  } else {
+                    resolve(groupId);
+                  }
+                });
+              });
+            } catch (groupError) {
+              console.error('Error creating tab group:', groupError);
+              continue; // Skip to next group instead of failing completely
+            }
+            
+            // Set the group title
+            if (groupId !== undefined) {
+              try {
+                await new Promise(resolve => {
+                  chrome.tabGroups.update(groupId, { title: groupName }, () => {
+                    if (chrome.runtime.lastError) {
+                      console.warn('Failed to set group name:', chrome.runtime.lastError);
+                    }
+                    resolve();
+                  });
+                });
+              } catch (titleError) {
+                console.warn('Error setting group title:', titleError);
+                // Continue even if title setting fails
+              }
+            }
+          } catch (err) {
+            console.error('Error creating tab group for', groupName, err);
+            // Continue with other groups even if one fails
+          }
+        }
+      }
+    } else {
+      // Simple domain-based grouping as fallback
+      const domains = {};
+      
+      tabs.forEach(tab => {
+        try {
+          const url = new URL(tab.url);
+          const domain = url.hostname;
+          
+          if (!domains[domain]) {
+            domains[domain] = [];
+          }
+          
+          domains[domain].push(tab.id);
+        } catch (error) {
+          console.warn('Invalid URL:', tab.url);
+        }
+      });
+      
+      // Create tab groups for domains with multiple tabs
+      for (const [domain, tabIds] of Object.entries(domains)) {
+        if (tabIds.length > 1) {
+          try {
+            let groupId;
+            try {
+              groupId = await new Promise((resolve, reject) => {
+                chrome.tabs.group({ tabIds }, (groupId) => {
+                  if (chrome.runtime.lastError) {
+                    reject(chrome.runtime.lastError);
+                  } else {
+                    resolve(groupId);
+                  }
+                });
+              });
+            } catch (groupError) {
+              console.error('Error creating tab group:', groupError);
+              continue; // Skip to next group instead of failing completely
+            }
+            
+            if (groupId !== undefined) {
+              // Extract domain name for group title
+              let title = domain.replace('www.', '');
+              if (title.includes('.')) {
+                title = title.split('.')[0];
+              }
+              
+              // Capitalize first letter
+              title = title.charAt(0).toUpperCase() + title.slice(1);
+              
+              try {
+                await new Promise(resolve => {
+                  chrome.tabGroups.update(groupId, { title }, () => {
+                    if (chrome.runtime.lastError) {
+                      console.warn('Failed to set group name:', chrome.runtime.lastError);
+                    }
+                    resolve();
+                  });
+                });
+              } catch (titleError) {
+                console.warn('Error setting group title:', titleError);
+                // Continue even if title setting fails
+              }
+            }
+          } catch (err) {
+            console.error('Error creating tab group for', domain, err);
+            // Continue with other domains even if one fails
+          }
+        }
+      }
+    }
+    
+    console.log('Tab organization complete');
+    return { success: true };
+  } catch (error) {
+    console.error('Error organizing tabs:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to organize tabs'
+    };
+  }
 };
 
 // Save all current tabs to a named group
@@ -298,18 +405,57 @@ const createTabGroup = async (tabIds, groupName) => {
   }
   
   try {
+    // Check if the tab groups API is available
+    if (!chrome.tabGroups) {
+      console.warn('Tab Groups API is not available in this browser');
+      return { 
+        success: false, 
+        error: 'Tab Groups API is not available in this browser. Try using Chrome version 89 or newer.'
+      };
+    }
+    
     // Create a new tab group with the specified tabs
-    const groupId = await new Promise(resolve => {
-      chrome.tabs.group({ tabIds }, (groupId) => resolve(groupId));
+    const groupId = await new Promise((resolve, reject) => {
+      try {
+        chrome.tabs.group({ tabIds }, (groupId) => {
+          if (chrome.runtime.lastError) {
+            reject(chrome.runtime.lastError);
+          } else {
+            resolve(groupId);
+          }
+        });
+      } catch (err) {
+        reject(err);
+      }
     });
     
-    // Set the group name
-    await chrome.tabGroups.update(groupId, { title: groupName || 'New Group' });
+    // Set the group name if groupId was returned successfully
+    if (groupId !== undefined) {
+      try {
+        await new Promise((resolve, reject) => {
+          chrome.tabGroups.update(groupId, { title: groupName || 'New Group' }, () => {
+            if (chrome.runtime.lastError) {
+              // If updating the name fails, we still created the group successfully
+              console.warn('Failed to set group name:', chrome.runtime.lastError);
+              resolve();
+            } else {
+              resolve();
+            }
+          });
+        });
+      } catch (nameError) {
+        // If setting the name fails, log it but don't consider the whole operation failed
+        console.warn('Error setting group name:', nameError);
+      }
+    }
     
     return { success: true, groupId };
   } catch (error) {
     console.error('Error creating tab group:', error);
-    return { success: false, error: error.message };
+    return { 
+      success: false, 
+      error: error.message || 'Failed to create tab group'
+    };
   }
 };
 
@@ -321,6 +467,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     switch (request.action) {
       case 'organizeTabs':
         response = await organizeTabs();
+        if (response.fallback && response.success) {
+          // If we used the fallback method, include a message to show the user
+          response.message = response.message || "Tabs organized successfully using alternative method. Your tabs were saved for reference.";
+        }
         break;
       
       case 'saveTabs':
@@ -352,13 +502,79 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
         
         if (tabs.length > 0) {
-          // Create a new group with the active tab
-          const groupId = await new Promise(resolve => {
-            chrome.tabs.group({ tabIds: [tabs[0].id] }, (groupId) => resolve(groupId));
-          });
+          try {
+            // Check if the tab groups API is available
+            const hasTabGroupsSupport = typeof chrome.tabs.group === 'function' && 
+                                       typeof chrome.tabGroups?.update === 'function';
+            
+            if (!hasTabGroupsSupport) {
+              // Use fallback method - save the tab instead
+              const timestamp = new Date().toLocaleString();
+              const groupName = `New Group - ${timestamp}`;
+              
+              // Format tabs for storage
+              const tabData = tabs.map(tab => ({
+                url: tab.url,
+                title: tab.title,
+                favIconUrl: tab.favIconUrl || '',
+                savedAt: Date.now()
+              }));
+              
+              // Save to storage
+              await saveTabGroup(groupName, tabData);
+              
+              response = { 
+                success: true, 
+                fallback: true,
+                message: `Tab Groups API not available, but the tab was saved to "${groupName}" for reference.`
+              };
+              break;
+            }
           
-          chrome.tabGroups.update(groupId, { title: 'New Group' });
-          response = { success: true, groupId };
+            // Create a new group with the active tab
+            const groupId = await new Promise((resolve, reject) => {
+              try {
+                chrome.tabs.group({ tabIds: [tabs[0].id] }, (groupId) => {
+                  if (chrome.runtime.lastError) {
+                    reject(chrome.runtime.lastError);
+                  } else {
+                    resolve(groupId);
+                  }
+                });
+              } catch (err) {
+                reject(err);
+              }
+            });
+            
+            // Set the group name if groupId was returned successfully
+            if (groupId !== undefined) {
+              try {
+                await new Promise((resolve) => {
+                  chrome.tabGroups.update(groupId, { title: 'New Group' }, () => {
+                    if (chrome.runtime.lastError) {
+                      console.warn('Failed to set group name:', chrome.runtime.lastError);
+                    }
+                    resolve();
+                  });
+                });
+              } catch (nameError) {
+                console.warn('Error setting group name:', nameError);
+              }
+            }
+            
+            response = { success: true, groupId };
+          } catch (error) {
+            console.error('Error creating new group:', error);
+            response = { 
+              success: false, 
+              error: error.message || 'Failed to create new group'
+            };
+          }
+        } else {
+          response = { 
+            success: false, 
+            error: 'No active tab found'
+          };
         }
         break;
         

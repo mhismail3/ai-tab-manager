@@ -5,15 +5,56 @@ import SearchBar from '../components/SearchBar';
 import QuickActions from '../components/QuickActions';
 import SuggestionCard from '../components/SuggestionCard';
 
+const Toast = ({ message, isVisible, type = 'success' }) => {
+  if (!isVisible) return null;
+  
+  const getBgColor = () => {
+    switch (type) {
+      case 'success': return 'var(--success)';
+      case 'error': return 'var(--danger)';
+      case 'info': return 'var(--info)';
+      default: return 'var(--success)';
+    }
+  };
+  
+  return (
+    <div style={{
+      position: 'fixed',
+      bottom: '20px',
+      right: '20px',
+      backgroundColor: getBgColor(),
+      color: 'white',
+      padding: '10px 15px',
+      borderRadius: '4px',
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+      zIndex: 1000,
+      animation: 'fadeIn 0.3s, fadeOut 0.3s 2.7s',
+      animationFillMode: 'forwards'
+    }}>
+      {message}
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeOut {
+          from { opacity: 1; transform: translateY(0); }
+          to { opacity: 0; transform: translateY(20px); }
+        }
+      `}</style>
+    </div>
+  );
+};
+
 const Popup = () => {
   const [tabs, setTabs] = useState([]);
   const [tabGroups, setTabGroups] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [suggestion, setSuggestion] = useState(null);
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
 
-  useEffect(() => {
-    // Fetch current tabs from Chrome API
+  const loadTabs = () => {
     chrome.tabs.query({}, (allTabs) => {
       setTabs(allTabs);
       setLoading(false);
@@ -32,6 +73,11 @@ const Popup = () => {
     chrome.tabGroups && chrome.tabGroups.query({}, (groups) => {
       setTabGroups(groups || []);
     });
+  };
+
+  useEffect(() => {
+    // Fetch current tabs from Chrome API
+    loadTabs();
   }, []);
 
   const handleSearch = (query) => {
@@ -47,10 +93,31 @@ const Popup = () => {
   };
 
   const handleOrganizeTabs = () => {
+    setLoading(true);
     chrome.runtime.sendMessage({ action: 'organizeTabs' }, (response) => {
       if (response && response.success) {
         setSuggestion(null);
+        setToast({
+          visible: true,
+          message: response.message || 'Tabs organized successfully!',
+          type: 'success'
+        });
+        
+        // Reload tabs to show updated groups
+        loadTabs();
+      } else {
+        setToast({
+          visible: true,
+          message: response?.error || 'Failed to organize tabs',
+          type: 'error'
+        });
+        setLoading(false);
       }
+      
+      // Hide toast after 3 seconds
+      setTimeout(() => {
+        setToast(prev => ({ ...prev, visible: false }));
+      }, 3000);
     });
   };
 
@@ -134,6 +201,12 @@ const Popup = () => {
           <FiCpu style={{ marginRight: '6px' }} /> AI Insights Dashboard
         </button>
       </footer>
+      
+      <Toast 
+        message={toast.message}
+        isVisible={toast.visible}
+        type={toast.type}
+      />
     </div>
   );
 };
