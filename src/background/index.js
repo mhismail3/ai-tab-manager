@@ -6,6 +6,7 @@ import { getTabActivityData } from '../models/tabActivity';
 const IDLE_TAB_DAYS = 7; // Number of days before a tab is considered idle
 const AUTO_SUGGEST_INTERVAL = 1000 * 60 * 60; // Check every hour
 const MAX_HISTORY_ITEMS = 100; // Store up to 100 tab URLs in history
+const TAB_LIMIT_CHECK_INTERVAL = 1000 * 5; // Check tab limit every 5 seconds
 
 // Initialize state
 let state = {
@@ -18,31 +19,54 @@ let state = {
     cleanupThreshold: 10, // Suggest cleanup when 10+ tabs are open
     useAI: true,
     syncEnabled: false,
-    syncInterval: 60 // Sync every 60 minutes
-  }
+    syncInterval: 60, // Sync every 60 minutes
+    tabLimit: 10, // Default max number of tabs
+    closeStrategy: 'oldest', // Default tab closing strategy
+    notifyTabLimit: true // Default notification setting
+  },
+  lastTabLimitNotification: 0 // Timestamp of last notification to prevent spam
 };
 
 // Load settings on startup
 const loadSettings = async () => {
   try {
     const data = await new Promise(resolve => {
-      chrome.storage.sync.get('settings', (result) => {
-        resolve(result.settings);
+      chrome.storage.sync.get([
+        'settings', 
+        'tabLimit', 
+        'closeStrategy', 
+        'notifyTabLimit'
+      ], (result) => {
+        resolve(result);
       });
     });
     
-    if (data) {
-      state.settings = { ...state.settings, ...data };
+    if (data.settings) {
+      state.settings = { ...state.settings, ...data.settings };
+    }
+    
+    // For backward compatibility, also check individual settings
+    if (data.tabLimit) {
+      state.settings.tabLimit = data.tabLimit;
+    }
+    
+    if (data.closeStrategy) {
+      state.settings.closeStrategy = data.closeStrategy;
+    }
+    
+    if (data.notifyTabLimit !== undefined) {
+      state.settings.notifyTabLimit = data.notifyTabLimit;
     }
   } catch (error) {
     console.error('Error loading settings:', error);
   }
 };
 
-// Save settings
+// Save settings to storage and update state
 const saveSettings = async (settings) => {
   state.settings = { ...state.settings, ...settings };
   await chrome.storage.sync.set({ settings: state.settings });
+  return state.settings;
 };
 
 // Load tab metadata from storage
@@ -459,7 +483,7 @@ const createTabGroup = async (tabIds, groupName) => {
   }
 };
 
-// Handle incoming extension messages
+// Background script message handler
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   (async () => {
     let response = { success: false };
@@ -488,6 +512,34 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         
       case 'getSettings':
         response = { success: true, settings: state.settings };
+        break;
+      
+      // For backward compatibility - individual settings updates
+      case 'updateTabLimit':
+        state.settings.tabLimit = request.tabLimit;
+        await chrome.storage.sync.set({ 
+          tabLimit: request.tabLimit,
+          settings: state.settings 
+        });
+        response = { success: true, tabLimit: request.tabLimit };
+        break;
+        
+      case 'updateCloseStrategy':
+        state.settings.closeStrategy = request.closeStrategy;
+        await chrome.storage.sync.set({ 
+          closeStrategy: request.closeStrategy,
+          settings: state.settings 
+        });
+        response = { success: true, closeStrategy: request.closeStrategy };
+        break;
+        
+      case 'updateNotifyTabLimit':
+        state.settings.notifyTabLimit = request.notifyTabLimit;
+        await chrome.storage.sync.set({ 
+          notifyTabLimit: request.notifyTabLimit,
+          settings: state.settings 
+        });
+        response = { success: true, notifyTabLimit: request.notifyTabLimit };
         break;
         
       case 'naturalLanguageSearch':
@@ -642,7 +694,144 @@ chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) =
         archiveTabs(idleTabIds);
       });
     }
+  } else if (notificationId === 'tab-limit-notification') {
+    if (buttonIndex === 0) { // Close Tabs was clicked
+      handleTabLimitAction();
+    }
   }
+});
+
+// Check if tab count exceeds limit and handle accordingly
+const checkTabLimit = async () => {
+  try {
+    // Get all tabs
+    const tabs = await new Promise(resolve => {
+      chrome.tabs.query({}, tabs => resolve(tabs));
+    });
+    
+    // If tab count is less than limit, do nothing
+    if (tabs.length <= state.settings.tabLimit) {
+      return;
+    }
+    
+    console.log(`Tab limit exceeded: ${tabs.length} tabs open, limit is ${state.settings.tabLimit}`);
+    
+    // If notification is enabled, show a notification
+    if (state.settings.notifyTabLimit) {
+      // Don't spam notifications - only show one per minute
+      const now = Date.now();
+      if (now - state.lastTabLimitNotification > 60000) {
+        state.lastTabLimitNotification = now;
+        
+        chrome.notifications.create('tab-limit-notification', {
+          type: 'basic',
+          iconUrl: 'icons/icon128.png',
+          title: 'Tab Limit Reached',
+          message: `You have ${tabs.length} tabs open, exceeding your limit of ${state.settings.tabLimit}.`,
+          buttons: [
+            { title: 'Close Tabs' },
+            { title: 'Dismiss' }
+          ],
+          priority: 2
+        });
+      }
+    }
+    
+    // If auto-close is needed in the future, this is where it would go
+  } catch (error) {
+    console.error('Error checking tab limit:', error);
+  }
+};
+
+// Close tabs based on the selected strategy
+const handleTabLimitAction = async () => {
+  try {
+    // Get all tabs
+    const tabs = await new Promise(resolve => {
+      chrome.tabs.query({}, tabs => resolve(tabs));
+    });
+    
+    // Calculate how many tabs to close
+    const tabsToCloseCount = Math.max(0, tabs.length - state.settings.tabLimit);
+    
+    if (tabsToCloseCount <= 0) {
+      return;
+    }
+    
+    let tabsToClose = [];
+    
+    // Select tabs to close based on the strategy
+    if (state.settings.closeStrategy === 'oldest') {
+      // Get activity data to find oldest tabs
+      const activityData = await getTabActivityData();
+      
+      // Sort tabs by last accessed time (oldest first)
+      const tabsWithActivity = tabs.map(tab => ({
+        tab,
+        lastAccessed: activityData[tab.id]?.lastAccessed || Date.now()
+      })).sort((a, b) => a.lastAccessed - b.lastAccessed);
+      
+      // Take the oldest tabs
+      tabsToClose = tabsWithActivity
+        .slice(0, tabsToCloseCount)
+        .map(item => item.tab.id);
+    } else if (state.settings.closeStrategy === 'leastUsed') {
+      // Get activity data to find least used tabs
+      const activityData = await getTabActivityData();
+      
+      // Sort tabs by access count (least used first)
+      const tabsWithActivity = tabs.map(tab => ({
+        tab,
+        accessCount: activityData[tab.id]?.accessCount || 0
+      })).sort((a, b) => a.accessCount - b.accessCount);
+      
+      // Take the least used tabs
+      tabsToClose = tabsWithActivity
+        .slice(0, tabsToCloseCount)
+        .map(item => item.tab.id);
+    }
+    
+    // If we found tabs to close, save them first (to prevent data loss) and then close them
+    if (tabsToClose.length > 0) {
+      // Get tab data for the tabs to close
+      const tabsToSave = await new Promise(resolve => {
+        chrome.tabs.query({ currentWindow: true }, (allTabs) => {
+          const filtered = allTabs.filter(tab => tabsToClose.includes(tab.id));
+          resolve(filtered);
+        });
+      });
+      
+      // Save the tabs first
+      const tabData = tabsToSave.map(tab => ({
+        url: tab.url,
+        title: tab.title,
+        favIconUrl: tab.favIconUrl || '',
+        savedAt: Date.now()
+      }));
+      
+      // Save to storage
+      await saveTabGroup(`Auto-closed tabs - ${new Date().toLocaleString()}`, tabData);
+      
+      // Then close the tabs
+      chrome.tabs.remove(tabsToClose);
+      
+      // Show a notification about the closed tabs
+      chrome.notifications.create('tabs-closed-notification', {
+        type: 'basic',
+        iconUrl: 'icons/icon128.png',
+        title: 'Tabs Closed',
+        message: `${tabsToClose.length} tabs were closed based on your settings. They have been saved for reference.`,
+        priority: 1
+      });
+    }
+  } catch (error) {
+    console.error('Error handling tab limit action:', error);
+  }
+};
+
+// Listen for tab creation to check tab limit
+chrome.tabs.onCreated.addListener(() => {
+  checkTabLimit();
 });
 
 // Initialize on startup
@@ -665,6 +854,11 @@ const init = async () => {
     // Save the cleaned metadata
     chrome.storage.local.set({ tabMetadata: state.tabMetadata });
   });
+  
+  // Start checking tab limit periodically
+  if (TAB_LIMIT_CHECK_INTERVAL > 0) {
+    setInterval(checkTabLimit, TAB_LIMIT_CHECK_INTERVAL);
+  }
 };
 
 // Call initialization

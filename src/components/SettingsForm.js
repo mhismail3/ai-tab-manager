@@ -41,14 +41,27 @@ const SettingsForm = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    const newValue = name === 'tabLimit' ? parseInt(value, 10) : value;
+    
+    // Update state locally
     setSettings(prev => ({
       ...prev,
-      [name]: name === 'tabLimit' ? parseInt(value, 10) : name === 'enableAnalytics' ? e.target.checked : value
+      [name]: newValue
     }));
+    
+    // Send individual setting update to background script for immediate effect
+    chrome.runtime.sendMessage({ 
+      action: `update${name.charAt(0).toUpperCase() + name.slice(1)}`,
+      [name]: newValue
+    });
   };
 
   const handleSave = () => {
-    chrome.storage.sync.set(settings, () => {
+    // Update all settings in the background script
+    chrome.runtime.sendMessage({ 
+      action: 'updateSettings',
+      settings: settings
+    }, () => {
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus(''), 3000);
     });
@@ -70,6 +83,23 @@ const SettingsForm = () => {
       ...prev,
       excludedDomains: prev.excludedDomains.filter(d => d !== domain)
     }));
+  };
+
+  const handleCheckboxChange = (settingName) => {
+    // Toggle the setting
+    const newValue = !settings[settingName];
+    
+    // Update local state
+    setSettings(prev => ({
+      ...prev,
+      [settingName]: newValue
+    }));
+    
+    // Send individual setting update to background script for immediate effect
+    chrome.runtime.sendMessage({ 
+      action: `update${settingName.charAt(0).toUpperCase() + settingName.slice(1)}`,
+      [settingName]: newValue
+    });
   };
 
   return (
@@ -173,12 +203,7 @@ const SettingsForm = () => {
               type="checkbox"
               id="enableAnalytics"
               checked={settings.enableAnalytics !== false}
-              onChange={() => 
-                setSettings(prev => ({
-                  ...prev,
-                  enableAnalytics: prev.enableAnalytics === false ? true : false
-                }))
-              }
+              onChange={() => handleCheckboxChange('enableAnalytics')}
             />
             <label htmlFor="enableAnalytics">Enable tab usage analytics</label>
           </div>
@@ -195,12 +220,7 @@ const SettingsForm = () => {
               type="checkbox"
               id="notifyTabLimit"
               checked={settings.notifyTabLimit !== false}
-              onChange={() => 
-                setSettings(prev => ({
-                  ...prev,
-                  notifyTabLimit: prev.notifyTabLimit === false ? true : false
-                }))
-              }
+              onChange={() => handleCheckboxChange('notifyTabLimit')}
             />
             <label htmlFor="notifyTabLimit">Notify when tab limit is reached</label>
           </div>
@@ -212,12 +232,7 @@ const SettingsForm = () => {
               type="checkbox"
               id="notifyTabSuggestions"
               checked={settings.notifyTabSuggestions !== false}
-              onChange={() => 
-                setSettings(prev => ({
-                  ...prev,
-                  notifyTabSuggestions: prev.notifyTabSuggestions === false ? true : false
-                }))
-              }
+              onChange={() => handleCheckboxChange('notifyTabSuggestions')}
             />
             <label htmlFor="notifyTabSuggestions">Notify when tab organization suggestions are available</label>
           </div>
