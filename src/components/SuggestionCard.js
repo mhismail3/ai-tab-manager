@@ -1,19 +1,19 @@
-import React from 'react';
-import { FiX, FiCpu, FiAlertCircle, FiCheck, FiClock } from 'react-icons/fi';
+import React, { useState } from 'react';
+import { FiX, FiCpu, FiAlertCircle, FiCheck, FiClock, FiLayers } from 'react-icons/fi';
 
 const getSuggestionIcon = (type) => {
   const iconSize = 20;
   switch (type) {
     case 'cleanup':
-      return <FiCpu size={iconSize} color="var(--primary)" />;
+      return <FiCpu size={iconSize} />;
     case 'warning':
-      return <FiAlertCircle size={iconSize} color="var(--warning)" />;
+      return <FiAlertCircle size={iconSize} />;
     case 'success':
-      return <FiCheck size={iconSize} color="var(--success)" />;
+      return <FiCheck size={iconSize} />;
     case 'reminder':
-      return <FiClock size={iconSize} color="var(--info)" />;
+      return <FiClock size={iconSize} />;
     default:
-      return <FiCpu size={iconSize} color="var(--primary)" />;
+      return <FiCpu size={iconSize} />;
   }
 };
 
@@ -34,6 +34,23 @@ const getBackground = (type) => {
 
 const SuggestionCard = ({ suggestion, onAction, onDismiss }) => {
   const { type, message, action } = suggestion;
+  const [showRenamePrompt, setShowRenamePrompt] = useState(false);
+  const [groupName, setGroupName] = useState(suggestion.defaultGroupName || '');
+  
+  const handleAction = () => {
+    if (action === 'Group These Tabs' && !showRenamePrompt) {
+      setShowRenamePrompt(true);
+      return;
+    }
+    
+    if (showRenamePrompt) {
+      // Call the action handler with the custom group name
+      onAction(groupName);
+      setShowRenamePrompt(false);
+    } else {
+      onAction();
+    }
+  };
   
   return (
     <div 
@@ -81,7 +98,7 @@ const SuggestionCard = ({ suggestion, onAction, onDismiss }) => {
           {getSuggestionIcon(type)}
         </div>
         
-        <div>
+        <div style={{ width: '100%' }}>
           <div 
             className="suggestion-message"
             style={{
@@ -94,19 +111,48 @@ const SuggestionCard = ({ suggestion, onAction, onDismiss }) => {
             {message}
           </div>
           
+          {showRenamePrompt && (
+            <div style={{ marginBottom: '12px' }}>
+              <input
+                type="text"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                placeholder="Enter group name"
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  marginBottom: '8px'
+                }}
+                autoFocus
+              />
+            </div>
+          )}
+          
           {action && (
             <button
-              onClick={onAction}
-              className="btn-primary"
+              onClick={handleAction}
+              className="btn btn-primary"
               style={{ 
-                padding: '6px 12px',
-                fontSize: '12px',
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
+                justifyContent: 'center',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                fontSize: '14px',
+                fontWeight: '500',
+                backgroundColor: 'var(--primary)',
+                color: 'white',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
                 gap: '6px'
               }}
             >
-              {getSuggestionIcon(type)} {action}
+              {type === 'cleanup' ? <FiLayers size={16} color="white" /> : getSuggestionIcon(type)}
+              {showRenamePrompt ? 'Create Group' : action}
             </button>
           )}
         </div>

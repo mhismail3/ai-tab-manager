@@ -165,7 +165,12 @@ const Popup = () => {
           <div style={{ marginTop: '16px' }}>
             <SuggestionCard 
               suggestion={suggestion} 
-              onAction={handleOrganizeTabs}
+              onAction={(groupName) => {
+                handleOrganizeTabs();
+                // Group name might be provided from the card if the user entered a name
+                // But for general organize action we don't need it in the popup
+                setSuggestion(null);
+              }}
               onDismiss={() => setSuggestion(null)}
             />
           </div>

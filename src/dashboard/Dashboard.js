@@ -218,15 +218,24 @@ const Dashboard = () => {
                 suggestion={{
                   type: 'cleanup',
                   message: `You have ${group.tabs.length} similar tabs from ${group.name}`,
-                  action: 'Group These Tabs'
+                  action: 'Group These Tabs',
+                  defaultGroupName: group.name
                 }}
-                onAction={() => {
+                onAction={(groupName) => {
+                  // Use provided group name or fall back to original name
+                  const finalGroupName = groupName || group.name;
+                  
                   chrome.runtime.sendMessage({ 
                     action: 'createTabGroup', 
                     tabIds: group.tabs.map(tab => tab.id),
-                    groupName: group.name
+                    groupName: finalGroupName
                   }, (response) => {
                     if (response && response.success) {
+                      // Remove this suggestion from the list
+                      setCleanupSuggestions(
+                        cleanupSuggestions.filter(item => item.id !== group.id)
+                      );
+                      
                       // Refresh data to show updated groups
                       loadDashboardData();
                     }
