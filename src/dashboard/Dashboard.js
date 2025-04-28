@@ -22,6 +22,8 @@ import SuggestionCard from '../components/SuggestionCard';
 import { getTabActivityData, getTabUsageStatistics } from '../models/tabActivity';
 import { loadTabGroups } from '../models/tabStorage';
 import { suggestTabCleanup } from '../models/tabClassifier';
+import SettingsForm from '../components/SettingsForm';
+import TabGroups from '../components/TabGroups';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -40,6 +42,20 @@ const Dashboard = () => {
   
   useEffect(() => {
     loadDashboardData();
+    
+    // Check URL parameters for tab selection
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    if (tabParam && ['overview', 'tabs', 'groups', 'saved', 'analytics', 'settings'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    } else {
+      // Load default tab preference from storage
+      chrome.storage.sync.get(['defaultTab'], (result) => {
+        if (result.defaultTab && ['overview', 'tabs', 'groups', 'saved', 'analytics', 'settings'].includes(result.defaultTab)) {
+          setActiveTab(result.defaultTab);
+        }
+      });
+    }
   }, []);
   
   const loadDashboardData = async () => {
@@ -128,6 +144,8 @@ const Dashboard = () => {
         return renderAllTabs();
       case 'saved':
         return renderSavedGroups();
+      case 'groups':
+        return renderTabGroups();
       case 'analytics':
         return renderAnalytics();
       case 'settings':
@@ -302,6 +320,16 @@ const Dashboard = () => {
     </>
   );
   
+  const renderTabGroups = () => (
+    <>
+      <div className="page-header">
+        <h1 className="page-title">Tab Group Management</h1>
+      </div>
+      
+      <TabGroups onRefresh={loadDashboardData} />
+    </>
+  );
+  
   const renderAnalytics = () => (
     <>
       <div className="page-header">
@@ -335,9 +363,7 @@ const Dashboard = () => {
           <h2 className="card-title">Preferences</h2>
         </div>
         
-        <div>
-          <p>Settings would go here in a production version.</p>
-        </div>
+        <SettingsForm />
       </div>
     </>
   );
@@ -365,6 +391,14 @@ const Dashboard = () => {
           >
             <FiTablet size={18} className="nav-item-icon" />
             Current Tabs
+          </li>
+          
+          <li 
+            className={`nav-item ${activeTab === 'groups' ? 'active' : ''}`}
+            onClick={() => setActiveTab('groups')}
+          >
+            <FiLayers size={18} className="nav-item-icon" />
+            Tab Groups
           </li>
           
           <li 

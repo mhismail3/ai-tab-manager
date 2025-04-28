@@ -259,4 +259,284 @@ body {
 
 .mb-4 {
   margin-bottom: 30px !important;
+}
+
+/* Settings Form Styles */
+.settings-form {
+  padding: 10px 0;
+}
+
+.settings-section {
+  margin-bottom: 30px;
+}
+
+.settings-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: var(--text-dark);
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.form-control {
+  width: 100%;
+  max-width: 400px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.form-control:focus {
+  border-color: var(--primary);
+  outline: none;
+}
+
+select.form-control {
+  height: 38px;
+  background-color: white;
+}
+
+.form-help {
+  font-size: 12px;
+  color: #6B7280;
+  margin-top: 4px;
+}
+
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.checkbox-group input[type="checkbox"] {
+  margin-right: 10px;
+}
+
+.checkbox-group label {
+  margin-bottom: 0;
+  cursor: pointer;
+}
+
+.form-actions {
+  margin-top: 30px;
+}
+
+.domain-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+  max-width: 400px;
+}
+
+.domain-form .form-control {
+  max-width: none;
+  flex: 1;
+}
+
+.domain-list {
+  max-width: 400px;
+}
+
+.domain-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: #f9fafb;
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+
+.domain-remove {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.no-domains {
+  font-style: italic;
+  color: #6B7280;
+}
+
+.btn-icon {
+  margin-right: 6px;
+}
+
+/* Tab Groups Styles */
+.tab-groups-container {
+  width: 100%;
+}
+
+.tab-groups-layout {
+  display: flex;
+  gap: 20px;
+}
+
+.tab-groups-panel {
+  width: 250px;
+  flex-shrink: 0;
+}
+
+.tab-groups-content {
+  flex: 1;
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  padding: 20px;
+}
+
+.tab-group-item {
+  padding: 12px 15px;
+  margin-bottom: 5px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-left-width: 3px;
+  border-left-style: solid;
+}
+
+.tab-group-item:hover {
+  background-color: rgba(74, 108, 247, 0.05);
+}
+
+.tab-group-item.active {
+  background-color: rgba(74, 108, 247, 0.1);
+}
+
+.tab-group-content {
+  width: 100%;
+}
+
+.tab-group-title {
+  display: flex;
+  align-items: center;
+  font-weight: 500;
+}
+
+.tab-group-icon {
+  margin-right: 10px;
+  opacity: 0.7;
+}
+
+.tab-group-count {
+  margin-left: 6px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.no-groups-message {
+  text-align: center;
+  padding: 30px 20px;
+  color: #6B7280;
+}
+
+.text-muted {
+  color: #6B7280;
+  font-size: 13px;
+}
+
+.tab-groups-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  text-align: center;
+}
+
+.empty-state-icon {
+  color: #E5E7EB;
+  margin-bottom: 20px;
+}
+
+.empty-state h2 {
+  margin: 0 0 10px 0;
+  font-size: 18px;
+}
+
+.empty-state p {
+  margin: 0;
+  color: #6B7280;
+}
+
+.color-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.group-color-selector {
+  margin: 20px 0;
+}
+
+.section-title {
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.color-options {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.color-option {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform 0.2s;
+}
+
+.color-option:hover {
+  transform: scale(1.1);
+}
+
+.color-option.active {
+  border-color: #333;
+}
+
+.tabs-section {
+  margin-top: 20px;
+}
+
+.btn-text {
+  background: transparent;
+  border: none;
+  padding: 5px;
+  border-radius: 4px;
+  color: #6B7280;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.btn-text:hover {
+  text-decoration: underline;
+  color: var(--primary);
 } 

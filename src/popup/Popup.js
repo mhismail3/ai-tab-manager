@@ -89,7 +89,7 @@ const Popup = () => {
   };
   
   const handleOpenOptions = () => {
-    chrome.runtime.openOptionsPage();
+    chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html?tab=settings') });
   };
 
   const handleOrganizeTabs = () => {

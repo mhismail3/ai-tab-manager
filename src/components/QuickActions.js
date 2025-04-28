@@ -3,7 +3,7 @@ import {
   FiCpu, 
   FiSave, 
   FiArchive, 
-  FiFolder,
+  FiLayers,
   FiPlusSquare
 } from 'react-icons/fi';
 
@@ -222,7 +222,7 @@ const QuickActions = () => {
   };
 
   const handleManageGroups = () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL('tabGroupView.html') });
+    chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html?tab=groups') });
   };
 
   const handleCreateGroup = () => {
@@ -255,7 +255,7 @@ const QuickActions = () => {
           onClick={handleArchiveTabs} 
         />
         <ActionButton 
-          icon={<FiFolder size={18} color="var(--success)" />} 
+          icon={<FiLayers size={18} color="var(--success)" />} 
           label="Groups" 
           onClick={handleManageGroups} 
         />
