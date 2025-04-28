@@ -116,11 +116,13 @@ const TabList = ({ tabs, loading, showFavIcon = true, onClose, onSelect }) => {
               {tab.title}
             </div>
             <div style={{
-              whiteSpace: 'nowrap',
+              wordBreak: 'break-all',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               fontSize: '11px',
-              color: '#6B7280'
+              color: '#6B7280',
+              maxHeight: '2.4em',
+              lineHeight: '1.2em'
             }}>
               {tab.url}
             </div>

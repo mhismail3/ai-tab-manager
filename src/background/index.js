@@ -141,15 +141,15 @@ const organizeTabs = async () => {
 };
 
 // Save all current tabs to a named group
-const saveTabs = async () => {
+const saveTabs = async (customName) => {
   // Get current tabs
   const tabs = await new Promise(resolve => {
     chrome.tabs.query({}, (tabs) => resolve(tabs));
   });
   
-  // Create a timestamp-based name
+  // Create a name based on custom input or timestamp
   const timestamp = new Date().toLocaleString();
-  const groupName = `Saved Tabs - ${timestamp}`;
+  const groupName = customName || `Saved Tabs - ${timestamp}`;
   
   // Format tabs for storage
   const tabData = tabs.map(tab => ({
@@ -291,6 +291,28 @@ const trackTabActivity = (tabId, windowId) => {
   chrome.storage.local.set({ tabMetadata: state.tabMetadata });
 };
 
+// Create a new tab group with specified tabs
+const createTabGroup = async (tabIds, groupName) => {
+  if (!tabIds || tabIds.length === 0) {
+    return { success: false, error: 'No tabs specified' };
+  }
+  
+  try {
+    // Create a new tab group with the specified tabs
+    const groupId = await new Promise(resolve => {
+      chrome.tabs.group({ tabIds }, (groupId) => resolve(groupId));
+    });
+    
+    // Set the group name
+    await chrome.tabGroups.update(groupId, { title: groupName || 'New Group' });
+    
+    return { success: true, groupId };
+  } catch (error) {
+    console.error('Error creating tab group:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 // Handle incoming extension messages
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   (async () => {
@@ -302,7 +324,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         break;
       
       case 'saveTabs':
-        response = await saveTabs();
+        response = await saveTabs(request.groupName);
         break;
         
       case 'archiveTabs':
@@ -338,6 +360,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           chrome.tabGroups.update(groupId, { title: 'New Group' });
           response = { success: true, groupId };
         }
+        break;
+        
+      case 'createTabGroup':
+        response = await createTabGroup(request.tabIds, request.groupName);
         break;
         
       default:

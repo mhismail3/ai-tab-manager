@@ -207,7 +207,18 @@ const Dashboard = () => {
                     action: 'createTabGroup', 
                     tabIds: group.tabs.map(tab => tab.id),
                     groupName: group.name
+                  }, (response) => {
+                    if (response && response.success) {
+                      // Refresh data to show updated groups
+                      loadDashboardData();
+                    }
                   });
+                }}
+                onDismiss={() => {
+                  // Remove this suggestion from the list
+                  setCleanupSuggestions(
+                    cleanupSuggestions.filter(item => item.id !== group.id)
+                  );
                 }}
               />
             ))}
