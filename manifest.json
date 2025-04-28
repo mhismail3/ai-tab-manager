@@ -9,7 +9,8 @@
     "bookmarks",
     "activeTab",
     "contextMenus",
-    "notifications"
+    "notifications",
+    "tabGroups"
   ],
   "action": {
     "default_popup": "popup.html",
