@@ -282,6 +282,16 @@ const Dashboard = () => {
     <>
       <div className="page-header">
         <h1 className="page-title">Saved Tab Groups</h1>
+        <button 
+          className="btn btn-outline" 
+          onClick={() => {
+            chrome.runtime.sendMessage({ action: 'saveTabs' }, () => {
+              loadDashboardData();
+            });
+          }}
+        >
+          <FiSave className="btn-icon" /> Save All
+        </button>
       </div>
       
       <SavedTabGroups 
