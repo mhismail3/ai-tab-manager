@@ -310,8 +310,12 @@ export const suggestTabCleanup = async (tabs, tabActivity) => {
     return (now - activity.lastAccessed) > ONE_WEEK;
   });
   
+  // Filter out tabs that are already in a group
+  // TAB_GROUP_ID_NONE is -1, which represents no group
+  const ungroupedTabs = tabs.filter(tab => tab.groupId === undefined || tab.groupId === -1);
+  
   // Group similar tabs based on URL patterns or content
-  const similarTabGroups = findSimilarTabs(tabs);
+  const similarTabGroups = findSimilarTabs(ungroupedTabs);
   
   return {
     staleTabs,
@@ -552,10 +556,16 @@ const calculateCategorySimilarities = (title, url, domain, keywords) => {
 
 // Find similar tabs based on URL patterns and content
 const findSimilarTabs = (tabs) => {
+  // Skip grouping if no tabs are provided
+  if (!tabs || tabs.length < 2) return [];
+  
   const urlGroups = {};
   
   // Group by domain first
   tabs.forEach(tab => {
+    // Skip tabs that are already part of a group
+    if (tab.groupId !== undefined && tab.groupId !== -1) return;
+    
     const domain = extractDomain(tab.url);
     if (!urlGroups[domain]) {
       urlGroups[domain] = [];

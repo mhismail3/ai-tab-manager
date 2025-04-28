@@ -89,7 +89,7 @@ const Dashboard = () => {
       // Get usage statistics
       const usageStats = await getTabUsageStatistics();
       
-      // Get cleanup suggestions
+      // Get cleanup suggestions - this now filters out already grouped tabs
       const cleanupSuggestions = await suggestTabCleanup(allTabs, activityData);
       
       // Calculate tab age
