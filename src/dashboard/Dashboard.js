@@ -52,7 +52,7 @@ const Dashboard = () => {
       loadAdditionalIcons().then(setAdditionalIcons);
     }
     
-    // Check URL parameters for tab selection
+    // Check URL parameters for tab selection - only on initial load
     const urlParams = new URLSearchParams(window.location.search);
     const tabParam = urlParams.get('tab');
     if (tabParam && ['overview', 'tabs', 'groups', 'saved', 'analytics', 'settings'].includes(tabParam)) {
@@ -65,7 +65,24 @@ const Dashboard = () => {
         }
       });
     }
-  }, [activeTab]);
+  }, []); // Empty dependency array to only run on mount
+
+  // Update URL when tab changes
+  useEffect(() => {
+    // Update URL to reflect current tab without reloading the page
+    const url = new URL(window.location.href);
+    if (activeTab === 'overview') {
+      url.searchParams.delete('tab');
+    } else {
+      url.searchParams.set('tab', activeTab);
+    }
+    window.history.replaceState({}, '', url.toString());
+    
+    // Load additional icons if needed
+    if (activeTab !== 'overview' && !additionalIcons) {
+      loadAdditionalIcons().then(setAdditionalIcons);
+    }
+  }, [activeTab, additionalIcons]);
   
   const loadDashboardData = async () => {
     setLoading(true);
