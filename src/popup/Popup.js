@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FiPlus, FiSearch, FiCpu, FiClipboard, FiSettings, FiLayers } from 'react-icons/fi';
+import { FiPlus, FiSearch, FiCpu, FiClipboard, FiSettings, FiLayers, FiFolder } from 'react-icons/fi';
 import TabList from '../components/TabList';
 import SearchBar from '../components/SearchBar';
 import QuickActions from '../components/QuickActions';
@@ -54,24 +54,53 @@ const Popup = () => {
   const [suggestion, setSuggestion] = useState(null);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
 
-  const loadTabs = () => {
+  const loadTabs = async () => {
     chrome.tabs.query({}, (allTabs) => {
       setTabs(allTabs);
-      setLoading(false);
       
-      // For demo purposes, let's pretend we've analyzed the tabs
-      if (allTabs.length > 5) {
+      // Check for tabs that aren't already in a group
+      const ungroupedTabs = allTabs.filter(tab => tab.groupId === undefined || tab.groupId === -1);
+      
+      // Only show suggestion if there are enough ungrouped tabs
+      if (ungroupedTabs.length > 5) {
         setSuggestion({
           type: 'cleanup',
-          message: `You have ${allTabs.length} tabs open. Would you like to organize them into groups?`,
+          message: `You have ${ungroupedTabs.length} ungrouped tabs open. Would you like to organize them into groups?`,
           action: 'Organize Tabs'
         });
+      } else {
+        setSuggestion(null);
       }
-    });
-
-    // Fetch existing tab groups
-    chrome.tabGroups && chrome.tabGroups.query({}, (groups) => {
-      setTabGroups(groups || []);
+      
+      // Fetch existing tab groups
+      if (chrome.tabGroups) {
+        chrome.tabGroups.query({}, (groups) => {
+          if (groups && groups.length > 0) {
+            // Get tabs for each group
+            const promises = groups.map(group => {
+              return new Promise(resolve => {
+                chrome.tabs.query({ groupId: group.id }, (tabs) => {
+                  resolve({
+                    ...group,
+                    tabs: tabs || []
+                  });
+                });
+              });
+            });
+            
+            Promise.all(promises).then(groupsWithTabs => {
+              setTabGroups(groupsWithTabs);
+              setLoading(false);
+            });
+          } else {
+            setTabGroups([]);
+            setLoading(false);
+          }
+        });
+      } else {
+        setTabGroups([]);
+        setLoading(false);
+      }
     });
   };
 
@@ -94,7 +123,8 @@ const Popup = () => {
 
   const handleOrganizeTabs = () => {
     setLoading(true);
-    chrome.runtime.sendMessage({ action: 'organizeTabs' }, (response) => {
+    // Specify that we only want to organize ungrouped tabs
+    chrome.runtime.sendMessage({ action: 'organizeTabs', ungroupedOnly: true }, (response) => {
       if (response && response.success) {
         setSuggestion(null);
         setToast({
@@ -187,11 +217,77 @@ const Popup = () => {
         
         {tabGroups.length > 0 && (
           <div className="tab-groups-section mt-4">
-            <h2 style={{ fontSize: '16px', fontWeight: 600 }}>Tab Groups</h2>
-            <ul className="tab-groups-list">
-              {tabGroups.map(group => (
-                <li key={group.id} style={{ color: group.color }}>
-                  {group.title || 'Unnamed group'} ({group.tabIds?.length || 0})
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center' 
+            }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 600 }}>Tab Groups</h2>
+              <a 
+                href="#" 
+                onClick={(e) => { 
+                  e.preventDefault(); 
+                  chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html?tab=groups') });
+                }}
+                style={{ 
+                  fontSize: '12px', 
+                  color: 'var(--primary)', 
+                  textDecoration: 'none' 
+                }}
+              >
+                View All
+              </a>
+            </div>
+            <ul className="tab-groups-list" style={{ 
+              listStyle: 'none', 
+              padding: 0, 
+              margin: '10px 0 0 0',
+              borderRadius: '8px',
+              overflow: 'hidden',
+              border: '1px solid var(--border-color)'
+            }}>
+              {tabGroups.map((group, index) => (
+                <li 
+                  key={group.id} 
+                  style={{ 
+                    padding: '10px 12px',
+                    borderBottom: index === tabGroups.length - 1 ? 'none' : '1px solid var(--border-color)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    background: 'white',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onClick={() => chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html?tab=groups') })}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                >
+                  <div 
+                    style={{ 
+                      width: '12px', 
+                      height: '12px', 
+                      borderRadius: '50%', 
+                      backgroundColor: group.color || '#ccc',
+                      marginRight: '8px'
+                    }}
+                  ></div>
+                  <FiFolder 
+                    size={16} 
+                    style={{ 
+                      marginRight: '8px',
+                      color: group.color || '#6B7280'
+                    }} 
+                  />
+                  <span style={{ fontWeight: 500 }}>
+                    {group.title || 'Unnamed group'}
+                  </span>
+                  <span style={{ 
+                    marginLeft: '6px', 
+                    color: '#6B7280', 
+                    fontSize: '12px' 
+                  }}>
+                    ({group.tabs?.length || 0})
+                  </span>
                 </li>
               ))}
             </ul>

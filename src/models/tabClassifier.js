@@ -334,19 +334,19 @@ export const suggestTabCleanup = async (tabs, tabActivity) => {
   const now = Date.now();
   const ONE_WEEK = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
   
-  // Find tabs that haven't been accessed for a week
-  const staleTabs = tabs.filter(tab => {
+  // Filter out tabs that are already in a group
+  // TAB_GROUP_ID_NONE is -1, which represents no group
+  const ungroupedTabs = tabs.filter(tab => tab.groupId === undefined || tab.groupId === -1);
+  
+  // Find tabs that haven't been accessed for a week (only consider ungrouped tabs)
+  const staleTabs = ungroupedTabs.filter(tab => {
     const activity = tabActivity[tab.id];
     if (!activity || !activity.lastAccessed) return false;
     
     return (now - activity.lastAccessed) > ONE_WEEK;
   });
   
-  // Filter out tabs that are already in a group
-  // TAB_GROUP_ID_NONE is -1, which represents no group
-  const ungroupedTabs = tabs.filter(tab => tab.groupId === undefined || tab.groupId === -1);
-  
-  // Group similar tabs based on URL patterns or content
+  // Group similar tabs based on URL patterns or content (only for ungrouped tabs)
   const similarTabGroups = findSimilarTabs(ungroupedTabs);
   
   return {

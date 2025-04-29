@@ -1,6 +1,6 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 // Import only the icons used in the overview tab initially
-import { FiRefreshCw, FiCpu, FiTablet, FiLayers, FiSave, FiClock } from 'react-icons/fi';
+import { FiRefreshCw, FiCpu, FiTablet, FiLayers, FiSave, FiClock, FiGrid, FiBarChart2, FiSettings } from 'react-icons/fi';
 
 // Lazy load components
 const StatCard = lazy(() => import('../components/StatCard'));
@@ -14,13 +14,10 @@ const TabGroups = lazy(() => import('../components/TabGroups'));
 const loadAdditionalIcons = async () => {
   const module = await import('react-icons/fi');
   return {
-    FiGrid: module.FiGrid,
     FiFile: module.FiFile,
     FiInbox: module.FiInbox,
-    FiBarChart2: module.FiBarChart2,
     FiActivity: module.FiActivity,
     FiArchive: module.FiArchive,
-    FiSettings: module.FiSettings,
     FiTrash2: module.FiTrash2
   };
 };

@@ -87,7 +87,7 @@ const loadTabMetadata = async () => {
 };
 
 // Organize tabs into groups based on content similarity
-const organizeTabs = async () => {
+const organizeTabs = async (options = {}) => {
   console.log('Starting tab organization...');
   
   // Get all tabs
@@ -98,6 +98,17 @@ const organizeTabs = async () => {
   if (!tabs || tabs.length < 2) {
     console.log('Not enough tabs to organize');
     return { success: false, error: 'Not enough tabs to organize' };
+  }
+  
+  // Filter out tabs that are already in groups if ungroupedOnly is specified
+  const tabsToOrganize = options.ungroupedOnly 
+    ? tabs.filter(tab => tab.groupId === undefined || tab.groupId === -1)
+    : tabs;
+  
+  // Check if we have enough tabs to organize after filtering
+  if (tabsToOrganize.length < 2) {
+    console.log('Not enough ungrouped tabs to organize');
+    return { success: false, error: 'Not enough ungrouped tabs to organize' };
   }
   
   // Instead of just checking if chrome.tabGroups exists, check if the required methods are available
@@ -113,7 +124,7 @@ const organizeTabs = async () => {
       const groupName = `Auto-Organized - ${timestamp}`;
       
       // Format tabs for storage
-      const tabData = tabs.map(tab => ({
+      const tabData = tabsToOrganize.map(tab => ({
         url: tab.url,
         title: tab.title,
         favIconUrl: tab.favIconUrl || '',
@@ -126,7 +137,7 @@ const organizeTabs = async () => {
       return { 
         success: true, 
         fallback: true,
-        message: `Tab Groups API not available, but ${tabs.length} tabs were saved to "${groupName}" for reference.`
+        message: `Tab Groups API not available, but ${tabsToOrganize.length} tabs were saved to "${groupName}" for reference.`
       };
     } catch (fallbackError) {
       console.error('Error in fallback tab saving:', fallbackError);
@@ -142,7 +153,7 @@ const organizeTabs = async () => {
     if (state.settings.useAI) {
       // This is a placeholder for AI-based tab classification
       // In a real implementation, this would use a machine learning model
-      const tabGroups = await classifyTabs(tabs);
+      const tabGroups = await classifyTabs(tabsToOrganize);
       
       // Create tab groups in Chrome
       for (const [groupName, groupTabs] of Object.entries(tabGroups)) {
@@ -193,7 +204,7 @@ const organizeTabs = async () => {
       // Simple domain-based grouping as fallback
       const domains = {};
       
-      tabs.forEach(tab => {
+      tabsToOrganize.forEach(tab => {
         try {
           const url = new URL(tab.url);
           const domain = url.hostname;
@@ -252,22 +263,18 @@ const organizeTabs = async () => {
                 // Continue even if title setting fails
               }
             }
-          } catch (err) {
-            console.error('Error creating tab group for', domain, err);
-            // Continue with other domains even if one fails
+          } catch (error) {
+            console.error('Error creating tab group for', domain, error);
+            // Continue with other groups even if one fails
           }
         }
       }
     }
     
-    console.log('Tab organization complete');
-    return { success: true };
+    return { success: true, message: `Organized ${tabsToOrganize.length} tabs into groups!` };
   } catch (error) {
     console.error('Error organizing tabs:', error);
-    return { 
-      success: false, 
-      error: error.message || 'Failed to organize tabs'
-    };
+    return { success: false, error: error.message || 'Failed to organize tabs' };
   }
 };
 
@@ -490,7 +497,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     
     switch (request.action) {
       case 'organizeTabs':
-        response = await organizeTabs();
+        response = await organizeTabs({ ungroupedOnly: request.ungroupedOnly });
         if (response.fallback && response.success) {
           // If we used the fallback method, include a message to show the user
           response.message = response.message || "Tabs organized successfully using alternative method. Your tabs were saved for reference.";
