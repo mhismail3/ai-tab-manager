@@ -302,7 +302,7 @@ const Popup = () => {
       <footer className="footer" style={{ textAlign: 'center', padding: '12px', borderTop: '1px solid var(--border-color)' }}>
         <button 
           className="btn-primary"
-          onClick={handleOpenDashboard}
+          onClick={() => chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html?tab=analytics') })}
           style={{ display: 'flex', alignItems: 'center', margin: '0 auto' }}
         >
           <FiCpu style={{ marginRight: '6px' }} /> AI Insights Dashboard

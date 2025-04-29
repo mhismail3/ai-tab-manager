@@ -1,7 +1,29 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { FiX, FiExternalLink, FiStar, FiClock, FiCircle } from 'react-icons/fi';
 
 const TabList = ({ tabs, loading, showFavIcon = true, onClose, onSelect }) => {
+  // Estimate height based on number of tabs (approx. 80px per tab with margins)
+  const [maxHeight, setMaxHeight] = useState(null);
+  
+  useEffect(() => {
+    // Dynamically calculate max height:
+    // - For dashboard view (when window is large), allow more space
+    // - For popup view (when window is small), keep more constrained
+    const isPopup = window.innerWidth < 600;
+    const tabHeight = 80; // Approximate height of a tab item in pixels
+    const viewportHeight = window.innerHeight;
+    const maxAvailableHeight = viewportHeight - (isPopup ? 300 : 200); // Reserve space for header and other UI
+    
+    // If we have many tabs, limit the container height to prevent it from becoming too large
+    // Only apply max-height if tabs would exceed the available space
+    const calculatedHeight = tabs.length * tabHeight;
+    if (calculatedHeight > maxAvailableHeight) {
+      setMaxHeight(`${maxAvailableHeight}px`);
+    } else {
+      setMaxHeight(null); // No height restriction needed
+    }
+  }, [tabs.length]);
+
   const handleTabClick = (tab) => {
     if (onSelect) {
       onSelect(tab);
@@ -64,8 +86,8 @@ const TabList = ({ tabs, loading, showFavIcon = true, onClose, onSelect }) => {
       listStyle: 'none', 
       padding: 0, 
       margin: 0,
-      maxHeight: '320px',
-      overflowY: 'auto'
+      maxHeight: maxHeight,
+      overflowY: maxHeight ? 'auto' : 'visible'
     }}>
       {tabs.map(tab => (
         <li 

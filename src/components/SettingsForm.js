@@ -198,56 +198,71 @@ const SettingsForm = () => {
         </div>
         
         <div className="form-group">
-          <div className="checkbox-group">
-            <input
+          <label className="checkbox-label">
+            <input 
               type="checkbox"
-              id="enableAnalytics"
-              checked={settings.enableAnalytics !== false}
+              checked={settings.enableAnalytics}
               onChange={() => handleCheckboxChange('enableAnalytics')}
             />
-            <label htmlFor="enableAnalytics">Enable tab usage analytics</label>
-          </div>
-          <p className="form-help">Collect tab usage data to improve suggestions (data stays on your device)</p>
+            Enable tab usage analytics
+          </label>
+          <p className="form-help">Collect data about your tab usage to provide insights and suggestions</p>
         </div>
       </div>
       
       <div className="settings-section">
-        <h3 className="settings-section-title">Notification Preferences</h3>
+        <h3 className="settings-section-title">Notifications</h3>
         
         <div className="form-group">
-          <div className="checkbox-group">
-            <input
+          <label className="checkbox-label">
+            <input 
               type="checkbox"
-              id="notifyTabLimit"
-              checked={settings.notifyTabLimit !== false}
+              checked={settings.notifyTabLimit}
               onChange={() => handleCheckboxChange('notifyTabLimit')}
             />
-            <label htmlFor="notifyTabLimit">Notify when tab limit is reached</label>
-          </div>
+            Notify when tab limit is reached
+          </label>
         </div>
         
         <div className="form-group">
-          <div className="checkbox-group">
-            <input
+          <label className="checkbox-label">
+            <input 
               type="checkbox"
-              id="notifyTabSuggestions"
-              checked={settings.notifyTabSuggestions !== false}
+              checked={settings.notifyTabSuggestions}
               onChange={() => handleCheckboxChange('notifyTabSuggestions')}
             />
-            <label htmlFor="notifyTabSuggestions">Notify when tab organization suggestions are available</label>
-          </div>
+            Show tab organization suggestions
+          </label>
         </div>
       </div>
       
-      <div className="form-actions">
+      <div className="settings-section">
+        <h3 className="settings-section-title">Help & Onboarding</h3>
+        
+        <div className="form-group">
+          <button 
+            className="btn btn-outline" 
+            onClick={() => {
+              chrome.storage.local.remove(['ai_tab_manager_onboarding_completed'], () => {
+                alert('Onboarding tutorial reset. Refresh the page to see the tutorial again.');
+              });
+            }}
+          >
+            Reset Onboarding Tutorial
+          </button>
+          <p className="form-help">Show the introductory tutorial again the next time you open the dashboard</p>
+        </div>
+      </div>
+      
+      <div className="settings-actions">
         <button 
           className="btn btn-primary" 
           onClick={handleSave}
-          style={{ display: 'flex', alignItems: 'center' }}
+          disabled={saveStatus === 'saved'}
         >
           {saveStatus === 'saved' ? (
             <>
-              <FiCheck className="btn-icon" /> Saved!
+              <FiCheck className="btn-icon" /> Saved
             </>
           ) : (
             <>
