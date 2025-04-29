@@ -186,7 +186,7 @@ const Popup = () => {
       <div className="container">
         <SearchBar 
           onSearch={handleSearch} 
-          placeholder="Search tabs by title or URL..."
+          placeholder="Search tabs by title or URL"
         />
         
         <QuickActions />

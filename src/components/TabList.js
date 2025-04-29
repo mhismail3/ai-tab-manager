@@ -15,27 +15,9 @@ const TabList = ({ tabs, loading, showFavIcon = true, onClose, onSelect }) => {
   const handleTabClose = (e, tabId) => {
     e.stopPropagation();
     
-    // First check if this is the active tab in the current window
-    chrome.tabs.query({ active: true, currentWindow: true }, (activeTabs) => {
-      const isActiveTab = activeTabs.length > 0 && activeTabs[0].id === tabId;
-      
-      if (isActiveTab) {
-        // If we're closing the active tab, first create a new tab to prevent popup from closing
-        chrome.tabs.create({ url: 'chrome://newtab', active: true }, () => {
-          // Then close the tab that was requested
-          chrome.tabs.remove(tabId, () => {
-            if (onClose) {
-              onClose(tabId);
-            }
-          });
-        });
-      } else {
-        // For non-active tabs, just close normally
-        chrome.tabs.remove(tabId, () => {
-          if (onClose) {
-            onClose(tabId);
-          }
-        });
+    chrome.tabs.remove(tabId, () => {
+      if (onClose) {
+        onClose(tabId);
       }
     });
   };
