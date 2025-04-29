@@ -212,6 +212,10 @@ const Popup = () => {
             tabs={filteredTabs} 
             loading={loading}
             showFavIcon={true}
+            onClose={(tabId) => {
+              // Refresh the tabs list after a tab is closed
+              loadTabs();
+            }}
           />
         </div>
         

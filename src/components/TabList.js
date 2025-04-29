@@ -1,5 +1,5 @@
 import React from 'react';
-import { FiX, FiExternalLink, FiStar, FiClock } from 'react-icons/fi';
+import { FiX, FiExternalLink, FiStar, FiClock, FiCircle } from 'react-icons/fi';
 
 const TabList = ({ tabs, loading, showFavIcon = true, onClose, onSelect }) => {
   const handleTabClick = (tab) => {
@@ -89,20 +89,38 @@ const TabList = ({ tabs, loading, showFavIcon = true, onClose, onSelect }) => {
             e.currentTarget.style.backgroundColor = 'white';
           }}
         >
-          {showFavIcon && tab.favIconUrl && (
-            <img 
-              src={tab.favIconUrl} 
-              alt=""
-              style={{
-                width: '16px',
-                height: '16px',
-                marginRight: '10px',
-                objectFit: 'contain'
-              }}
-              onError={(e) => {
-                e.target.style.display = 'none';
-              }}
-            />
+          {showFavIcon && (
+            <>
+              {tab.favIconUrl ? (
+                <img 
+                  src={tab.favIconUrl} 
+                  alt=""
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    marginRight: '10px',
+                    objectFit: 'contain'
+                  }}
+                  onError={(e) => {
+                    // Replace with a placeholder instead of hiding
+                    e.target.style.display = 'none';
+                    e.target.parentNode.innerHTML = '<div style="width: 16px; height: 16px; margin-right: 10px; display: flex; align-items: center; justify-content: center; color: #9CA3AF;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg></div>';
+                  }}
+                />
+              ) : (
+                <div style={{
+                  width: '16px',
+                  height: '16px',
+                  marginRight: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#9CA3AF'
+                }}>
+                  <FiCircle size={14} />
+                </div>
+              )}
+            </>
           )}
           
           <div style={{ flex: 1, overflow: 'hidden' }}>
