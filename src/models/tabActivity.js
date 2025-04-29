@@ -108,6 +108,21 @@ export const getLeastRecentTabs = async (limit = 10) => {
 export const getTabUsageStatistics = async () => {
   const activityData = await getTabActivityData();
   
+  // Get current tabs to ensure data accuracy
+  const tabs = await new Promise(resolve => {
+    chrome.tabs.query({}, (tabs) => {
+      if (chrome.runtime.lastError) {
+        console.error("Error querying tabs for statistics:", chrome.runtime.lastError);
+        resolve([]);
+      } else {
+        resolve(tabs || []);
+      }
+    });
+  });
+  
+  // The true count of open tabs comes from the tabs API, not the activity data
+  const actualTabCount = tabs.length;
+  
   // Calculate various metrics
   let totalAccesses = 0;
   let tabsWithActivity = 0;
@@ -127,7 +142,7 @@ export const getTabUsageStatistics = async () => {
   });
   
   return {
-    totalTabs: Object.keys(activityData).length,
+    totalTabs: actualTabCount, // Use the actual tab count from chrome.tabs.query
     tabsWithActivity,
     totalAccesses,
     averageAccessesPerTab: tabsWithActivity > 0 ? totalAccesses / tabsWithActivity : 0,

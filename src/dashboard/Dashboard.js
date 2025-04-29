@@ -58,17 +58,22 @@ const Dashboard = () => {
       setShowOnboarding(!result.ai_tab_manager_onboarding_completed);
     });
     
-    // Load all necessary data
-    loadDashboardData();
+    // First load the dashboard data (do this immediately, don't wait for tab determination)
+    console.log("Initial load - calling loadDashboardData");
+    loadDashboardData().then(tabCount => {
+      // If we got 0 tabs, which seems unlikely, try once more after a delay
+      if (tabCount === 0) {
+        console.log("Initial load returned 0 tabs, retrying after delay...");
+        setTimeout(() => {
+          loadDashboardData();
+        }, 1000);
+      }
+    });
     
-    // Load additional icons if not on overview tab
-    if (activeTab !== 'overview' && !additionalIcons) {
-      loadAdditionalIcons().then(setAdditionalIcons);
-    }
-    
-    // Check URL parameters for tab selection - only on initial load
+    // Then determine which tab to show
     const urlParams = new URLSearchParams(window.location.search);
     const tabParam = urlParams.get('tab');
+    
     if (tabParam && ['overview', 'tabs', 'groups', 'saved', 'analytics', 'settings'].includes(tabParam)) {
       setActiveTab(tabParam);
     } else {
@@ -79,17 +84,25 @@ const Dashboard = () => {
         }
       });
     }
+    
+    // Load additional icons if not on overview tab
+    if (activeTab !== 'overview' && !additionalIcons) {
+      loadAdditionalIcons().then(setAdditionalIcons);
+    }
   }, []); // Empty dependency array to only run on mount
 
   // Load analytics data when timeRange changes or analytics tab is active
   useEffect(() => {
     if (activeTab === 'analytics') {
+      console.log("Analytics tab active, loading analytics data");
       loadAnalyticsData();
     }
   }, [timeRange, activeTab]);
 
   // Update URL when tab changes
   useEffect(() => {
+    console.log(`Tab changed to: ${activeTab}`);
+    
     // Update URL to reflect current tab without reloading the page
     const url = new URL(window.location.href);
     if (activeTab === 'overview') {
@@ -99,19 +112,46 @@ const Dashboard = () => {
     }
     window.history.replaceState({}, '', url.toString());
     
+    // Always load fresh tab data when switching tabs
+    // This ensures all tab counts are up-to-date across the entire dashboard
+    console.log(`Reloading dashboard data because tab changed to: ${activeTab}`);
+    loadDashboardData();
+    
     // Load additional icons if needed
     if (activeTab !== 'overview' && !additionalIcons) {
       loadAdditionalIcons().then(setAdditionalIcons);
     }
-  }, [activeTab, additionalIcons]);
+  }, [activeTab]);
   
   const loadDashboardData = async () => {
     setLoading(true);
     
     try {
-      // Get all tabs
+      // Get all tabs with a more robust error handling approach
       const allTabs = await new Promise(resolve => {
-        chrome.tabs.query({}, (tabs) => resolve(tabs || []));
+        chrome.tabs.query({}, (tabs) => {
+          if (chrome.runtime.lastError) {
+            console.error("Error querying tabs:", chrome.runtime.lastError);
+            resolve([]);
+            return;
+          }
+          
+          console.log("Tab query returned:", tabs ? tabs.length : 0, "tabs");
+          
+          // If we got zero tabs but should have tabs, retry once after a short delay
+          if (!tabs || tabs.length === 0) {
+            console.warn("Got zero tabs, which seems incorrect. Retrying...");
+            setTimeout(() => {
+              chrome.tabs.query({}, (retryTabs) => {
+                console.log("Retry tab query returned:", retryTabs ? retryTabs.length : 0, "tabs");
+                resolve(retryTabs || []);
+              });
+            }, 500);
+            return;
+          }
+          
+          resolve(tabs || []);
+        });
       });
       
       // Get all windows
@@ -165,6 +205,9 @@ const Dashboard = () => {
       // Ensure totalTabs is correctly set using the allTabs array length
       const totalTabsCount = Array.isArray(allTabs) ? allTabs.length : 0;
       
+      // Log the final tab count before updating state
+      console.log("Setting tab count to:", totalTabsCount);
+      
       setStats({
         totalTabs: totalTabsCount,
         totalWindows: allWindows.length || 0,
@@ -176,15 +219,30 @@ const Dashboard = () => {
       
       console.log("Dashboard data loaded with", totalTabsCount, "tabs");
       
+      return totalTabsCount;
     } catch (error) {
       console.error('Error loading dashboard data:', error);
+      return 0;
     } finally {
       setLoading(false);
     }
   };
   
   const handleRefresh = () => {
-    loadDashboardData();
+    console.log("Manual refresh requested");
+    // First reset the stats to ensure a visual update even if the same values are loaded
+    setStats({
+      totalTabs: 0,
+      totalWindows: 0,
+      tabsPerWindow: 0,
+      oldestTab: 0,
+      savedGroups: 0
+    });
+    
+    // Then load fresh data
+    setTimeout(() => {
+      loadDashboardData();
+    }, 50);
   };
   
   const handleOrganizeTabs = () => {
@@ -250,7 +308,9 @@ const Dashboard = () => {
     }
   };
   
-  const renderOverview = () => (
+  const renderOverview = () => {
+    console.log("Rendering Overview with stats:", stats);
+    return (
     <>
       <div className="page-header">
         <h1 className="page-title">Dashboard Overview</h1>
@@ -365,7 +425,8 @@ const Dashboard = () => {
         />
       </div>
     </>
-  );
+    );
+  };
   
   const renderAllTabs = () => (
     <>
@@ -688,20 +749,12 @@ const Dashboard = () => {
   const loadAnalyticsData = async () => {
     setLoadingAnalytics(true);
     try {
-      // Get tabs count directly to ensure it's up to date
-      const allTabs = await new Promise(resolve => {
-        chrome.tabs.query({}, (tabs) => resolve(tabs || []));
-      });
+      console.log("Loading analytics data");
       
-      // Update totalTabs in stats to ensure consistency
-      const totalTabsCount = Array.isArray(allTabs) ? allTabs.length : 0;
-      setStats(prevStats => ({
-        ...prevStats,
-        totalTabs: totalTabsCount
-      }));
+      // First load the dashboard data to ensure all stats are updated consistently
+      await loadDashboardData();
       
       const [tabActivityModule] = await Promise.all([tabActivityImport]);
-      const usageStats = await tabActivityModule.getTabUsageStatistics();
       
       // Get most frequently accessed tabs
       const frequent = await tabActivityModule.getMostFrequentTabs(10);
@@ -709,8 +762,27 @@ const Dashboard = () => {
       // Get tabs that haven't been accessed in a while
       const oldTabs = await tabActivityModule.getLeastRecentTabs(10);
       
-      // Get additional tab information
-      const tabMap = allTabs.reduce((acc, tab) => {
+      // Make sure we have tabs data available
+      if (!tabs || tabs.length === 0) {
+        console.warn("Tab data not available for analytics, fetching again");
+        // Fetch tabs directly if not available from the dashboard data
+        const freshTabs = await new Promise(resolve => {
+          chrome.tabs.query({}, (tabs) => {
+            console.log("Fresh tabs query for analytics returned:", tabs ? tabs.length : 0, "tabs");
+            resolve(tabs || []);
+          });
+        });
+        
+        if (freshTabs && freshTabs.length > 0) {
+          setTabs(freshTabs); // Update the tabs state
+        } else {
+          console.error("Failed to get tabs for analytics");
+        }
+      }
+      
+      // Get additional tab information for the tabs loaded in the dashboard data
+      console.log(`Using ${tabs.length} tabs for analytics tab details`);
+      const tabMap = tabs.reduce((acc, tab) => {
         acc[tab.id] = tab;
         return acc;
       }, {});

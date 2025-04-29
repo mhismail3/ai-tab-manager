@@ -1,6 +1,9 @@
 import React from 'react';
 
 const StatCard = ({ title, value, icon, color, description }) => {
+  // Handle display of value, ensure 0 is displayed properly and not overlooked
+  const displayValue = value === 0 ? '0' : value;
+  
   return (
     <div className="stat-card">
       <div className="stat-header">
@@ -16,7 +19,7 @@ const StatCard = ({ title, value, icon, color, description }) => {
         <h3 className="stat-title">{title}</h3>
       </div>
       
-      <div className="stat-value">{value}</div>
+      <div className="stat-value">{displayValue}</div>
       
       {description && (
         <div className="stat-description">{description}</div>
