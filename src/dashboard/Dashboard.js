@@ -1,6 +1,6 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 // Import only the icons used in the overview tab initially
-import { FiRefreshCw, FiCpu, FiTablet, FiLayers, FiSave, FiClock, FiGrid, FiBarChart2, FiSettings } from 'react-icons/fi';
+import { FiRefreshCw, FiCpu, FiTablet, FiLayers, FiSave, FiClock, FiGrid, FiBarChart2, FiSettings, FiKey } from 'react-icons/fi';
 
 // Lazy load components
 const StatCard = lazy(() => import('../components/StatCard'));
@@ -52,10 +52,21 @@ const Dashboard = () => {
   const [frequentTabs, setFrequentTabs] = useState([]);
   const [oldTabs, setOldTabs] = useState([]);
   
+  // API Key state
+  const [apiKey, setApiKey] = useState('');
+  const [apiKeySaved, setApiKeySaved] = useState(false);
+  
   useEffect(() => {
     // Check if this is the first time user is accessing the dashboard
     chrome.storage.local.get(['ai_tab_manager_onboarding_completed'], (result) => {
       setShowOnboarding(!result.ai_tab_manager_onboarding_completed);
+    });
+    
+    // Load API key
+    chrome.storage.sync.get(['huggingfaceApiKey'], (result) => {
+      if (result.huggingfaceApiKey) {
+        setApiKey(result.huggingfaceApiKey);
+      }
     });
     
     // First load the dashboard data (do this immediately, don't wait for tab determination)
@@ -74,12 +85,12 @@ const Dashboard = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const tabParam = urlParams.get('tab');
     
-    if (tabParam && ['overview', 'tabs', 'groups', 'saved', 'analytics', 'settings'].includes(tabParam)) {
+    if (tabParam && ['overview', 'tabs', 'groups', 'saved', 'analytics', 'apikey', 'settings'].includes(tabParam)) {
       setActiveTab(tabParam);
     } else {
       // Load default tab preference from storage
       chrome.storage.sync.get(['defaultTab'], (result) => {
-        if (result.defaultTab && ['overview', 'tabs', 'groups', 'saved', 'analytics', 'settings'].includes(result.defaultTab)) {
+        if (result.defaultTab && ['overview', 'tabs', 'groups', 'saved', 'analytics', 'apikey', 'settings'].includes(result.defaultTab)) {
           setActiveTab(result.defaultTab);
         }
       });
@@ -297,6 +308,8 @@ const Dashboard = () => {
             {renderAnalytics()}
           </Suspense>
         );
+      case 'apikey':
+        return renderApiKey();
       case 'settings':
         return !additionalIcons ? loadingFallback : (
           <Suspense fallback={loadingFallback}>
@@ -746,6 +759,94 @@ const Dashboard = () => {
     </>
   );
   
+  const renderApiKey = () => {
+    const handleSaveApiKey = () => {
+      chrome.storage.sync.set({
+        huggingfaceApiKey: apiKey
+      }, () => {
+        setApiKeySaved(true);
+        setTimeout(() => setApiKeySaved(false), 2000);
+      });
+    };
+
+    return (
+      <>
+        <div className="page-header">
+          <h1 className="page-title">API Configuration</h1>
+        </div>
+        
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">AI Classification Settings</h2>
+            <p className="card-description">
+              Configure your AI model settings for intelligent tab classification
+            </p>
+          </div>
+          
+          <div className="card-content">
+            <div className="form-group">
+              <label className="form-label">
+                HuggingFace API Key (Optional)
+                <span className="form-hint">
+                  Adding an API key increases rate limits for AI-powered tab classification
+                </span>
+              </label>
+              <input
+                type="password"
+                className="form-input"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="hf_..."
+                style={{ fontFamily: 'monospace' }}
+              />
+            </div>
+            
+            <div className="form-info">
+              <div className="info-box">
+                <h4>How it works:</h4>
+                <ul>
+                  <li>✅ <strong>With API Key:</strong> AI-powered classification with higher rate limits</li>
+                  <li>🔄 <strong>Without API Key:</strong> Automatic fallback to keyword-based classification</li>
+                  <li>🔒 <strong>Privacy:</strong> Only tab titles and URLs are sent to the API</li>
+                </ul>
+              </div>
+              
+              <div className="info-box">
+                <h4>Get your free API key:</h4>
+                <p>
+                  Visit{' '}
+                  <a
+                    href="https://huggingface.co/settings/tokens"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="link"
+                  >
+                    HuggingFace Settings
+                  </a>
+                  {' '}to create a free API token
+                </p>
+              </div>
+            </div>
+            
+            <div className="form-actions">
+              <button
+                onClick={handleSaveApiKey}
+                className="btn btn-primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                <FiSave size={16} />
+                Save API Key
+              </button>
+              {apiKeySaved && (
+                <span className="success-message">API key saved successfully!</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  };
+  
   const loadAnalyticsData = async () => {
     setLoadingAnalytics(true);
     try {
@@ -890,6 +991,14 @@ const Dashboard = () => {
           >
             <FiBarChart2 size={18} className="nav-item-icon" />
             Analytics
+          </li>
+          
+          <li 
+            className={`nav-item ${activeTab === 'apikey' ? 'active' : ''}`}
+            onClick={() => setActiveTab('apikey')}
+          >
+            <FiKey size={18} className="nav-item-icon" />
+            API Key
           </li>
           
           <li 
