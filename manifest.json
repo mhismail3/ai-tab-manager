@@ -12,6 +12,9 @@
     "notifications",
     "tabGroups"
   ],
+  "host_permissions": [
+    "https://api-inference.huggingface.co/*"
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

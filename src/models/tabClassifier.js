@@ -69,6 +69,144 @@ const pageMetadataCache = new Map();
 let documentFrequency = {};
 let totalDocuments = 0;
 
+// --- AI-powered classification using HuggingFace zero-shot-classification API ---
+const HUGGINGFACE_API_URL = 'https://api-inference.huggingface.co/models/facebook/bart-large-mnli';
+// Optionally, set your HuggingFace API key here (or use env/config)
+const HUGGINGFACE_API_KEY = null; // e.g., 'hf_xxx' or null for anonymous (rate-limited)
+
+// Rate limiting and caching configuration
+const AI_CONFIG = {
+  rateLimitPerMinute: 10,
+  cacheDuration: 24 * 60 * 60 * 1000, // 24 hours in ms
+  retryDelay: 1000, // 1 second
+  maxRetries: 2
+};
+
+// Track API calls for rate limiting
+let apiCallsTimestamp = [];
+
+// Enhanced cache with timestamp
+const aiClassificationCache = new Map();
+
+// Check if we're within rate limits
+const canMakeApiCall = () => {
+  const now = Date.now();
+  // Remove timestamps older than 1 minute
+  apiCallsTimestamp = apiCallsTimestamp.filter(
+    timestamp => now - timestamp < 60000
+  );
+  return apiCallsTimestamp.length < AI_CONFIG.rateLimitPerMinute;
+};
+
+// Validate API key format (basic check)
+const isValidApiKey = (key) => {
+  return key && typeof key === 'string' && key.startsWith('hf_') && key.length > 8;
+};
+
+// Get and validate the API key from storage
+const getValidApiKey = async () => {
+  try {
+    const result = await chrome.storage.sync.get(['huggingfaceApiKey']);
+    const key = result.huggingfaceApiKey;
+    return isValidApiKey(key) ? key : null;
+  } catch (e) {
+    console.warn('Failed to get API key from storage:', e);
+    return null;
+  }
+};
+
+// Enhanced AI classification with validation and fallback
+const classifyTabWithAI = async (title, url) => {
+  const apiKey = await getValidApiKey();
+  if (!apiKey) {
+    console.log('No valid API key found, using keyword classification');
+    return null;
+  }
+
+  const cacheKey = `${title}${url}`;
+  
+  // Check cache first
+  const cached = aiClassificationCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp) < AI_CONFIG.cacheDuration) {
+    console.log('Using cached AI classification result');
+    return cached.categories;
+  }
+
+  // Check rate limiting
+  if (!canMakeApiCall()) {
+    console.warn('AI classification rate limit reached, falling back to keyword classification');
+    return null;
+  }
+
+  const input = `${title} ${url}`;
+  const candidateLabels = Object.keys(CATEGORIES);
+  
+  let retries = 0;
+  while (retries <= AI_CONFIG.maxRetries) {
+    try {
+      // Track API call
+      apiCallsTimestamp.push(Date.now());
+      console.log('Attempting AI classification...');
+
+      const response = await fetch(HUGGINGFACE_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          inputs: input,
+          parameters: {
+            candidate_labels: candidateLabels
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`HuggingFace API error: ${error}`);
+      }
+
+      const data = await response.json();
+      if (data && data.labels && data.scores) {
+        console.log('AI classification successful');
+        const threshold = 0.25;
+        const matched = data.labels.filter((label, i) => data.scores[i] > threshold);
+        const categories = matched.length > 0 ? matched : [data.labels[0]];
+        
+        // Cache the result
+        aiClassificationCache.set(cacheKey, {
+          categories,
+          timestamp: Date.now()
+        });
+        
+        return categories;
+      }
+      return null;
+    } catch (e) {
+      console.warn(`AI classification attempt ${retries + 1} failed:`, e);
+      if (retries < AI_CONFIG.maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, AI_CONFIG.retryDelay * (retries + 1)));
+        retries++;
+      } else {
+        console.log('AI classification failed, falling back to keyword classification');
+        return null;
+      }
+    }
+  }
+  return null;
+};
+
+// Clean up old cache entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of aiClassificationCache.entries()) {
+    if (now - value.timestamp > AI_CONFIG.cacheDuration) {
+      aiClassificationCache.delete(key);
+    }
+  }
+}, AI_CONFIG.cacheDuration);
+
 // Helper function to dynamically load TensorFlow when needed
 const loadTensorFlow = async () => {
   if (tf) return tf; // Return if already loaded
@@ -107,15 +245,31 @@ export const analyzeTabContent = async (tab) => {
   // Extract keywords using TF-IDF approach for better relevance
   const keywords = extractKeywords(tab.title, tab.url);
   
-  // Determine potential categories
-  const categorySimilarities = calculateCategorySimilarities(tab.title, tab.url, domain, keywords);
+  let matchedCategories = [];
+  let classificationMethod = 'keyword'; // Track which method was used
   
-  // Pick the most likely categories (above threshold)
-  const threshold = 0.25;
-  const matchedCategories = Object.entries(categorySimilarities)
-    .filter(([_, score]) => score > threshold)
-    .sort((a, b) => b[1] - a[1])
-    .map(([category]) => category);
+  // Try AI classification first if we have a valid API key
+  try {
+    const aiCategories = await classifyTabWithAI(tab.title, tab.url);
+    if (aiCategories && aiCategories.length > 0) {
+      matchedCategories = aiCategories;
+      classificationMethod = 'ai';
+    }
+  } catch (e) {
+    console.warn('AI classification failed:', e);
+    // Will fall back to keyword classification below
+  }
+  
+  // Fall back to keyword-based classification if AI didn't work
+  if (matchedCategories.length === 0) {
+    console.log('Using keyword-based classification');
+    const categorySimilarities = calculateCategorySimilarities(tab.title, tab.url, domain, keywords);
+    const threshold = 0.25;
+    matchedCategories = Object.entries(categorySimilarities)
+      .filter(([_, score]) => score > threshold)
+      .sort((a, b) => b[1] - a[1])
+      .map(([category]) => category);
+  }
   
   // Extract potential topics from text
   const topics = extractTopics(tab.title, tab.url);
@@ -129,7 +283,8 @@ export const analyzeTabContent = async (tab) => {
     keywords,
     categories: matchedCategories,
     topics,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    classificationMethod // Include which method was used
   };
   
   // Store in cache
